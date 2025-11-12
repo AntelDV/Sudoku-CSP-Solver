@@ -63,7 +63,8 @@ def _solve_fc_recursive_visual(board_wrapper: SudokuBoard, stats: dict, domains:
         is_consistent, pruned_log = yield from _prune_neighbors_visual(domains, row, col, num)
         
         if is_consistent:
-            if (yield from _solve_fc_recursive_visual(board_wrapper, stats, domains)):
+            result = yield from _solve_fc_recursive_visual(board_wrapper, stats, domains)
+            if result:
                 return True 
 
         stats["backtracks"] += 1

@@ -40,7 +40,9 @@ def solve_backtracking_visual(board_wrapper: SudokuBoard, stats: dict):
 
             # 3.2. "Gọi đệ quy" (bằng yield from)
             # Tiếp tục chạy hàm này cho ô tiếp theo
-            if (yield from solve_backtracking_visual(board_wrapper, stats)):
+            result = yield from solve_backtracking_visual(board_wrapper, stats)
+            
+            if result:
                 return True # Nếu nhánh con thành công -> trả về True
 
             # 3.3. Nếu đệ quy (result) trả về False -> NGÕ CỤT

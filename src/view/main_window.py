@@ -20,9 +20,9 @@ MAU_VIEN_3x3 = ("#000000", "#000000")
 MAU_VIEN_LUOI = ("#000000", "#000000") 
 
 MAU_VIEN_HIEN_TAI = "#F1C40F" 
-MAU_O_THU = "#3498DB"      
-MAU_O_QUAY_LUI = "#E74C3C" 
-MAU_VIEN_HANG_XOM = "#17A2B8" 
+MAU_O_THU = "#2ECC71"       
+MAU_O_QUAY_LUI = "#E74C3C"  
+MAU_VIEN_HANG_XOM = "#3498DB" 
 
 
 class MainView(ctk.CTkFrame):
@@ -59,8 +59,8 @@ class MainView(ctk.CTkFrame):
         return gia_tri_moi.isdigit() and '1' <= gia_tri_moi <= '9'
 
     def khoi_tao_giao_dien(self):
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=0)
+        self.grid_columnconfigure(0, weight=1, minsize=600)
+        self.grid_columnconfigure(1, minsize=380)
         self.grid_rowconfigure(0, weight=1)
         
         khung_luoi = ctk.CTkFrame(self, fg_color="transparent")
@@ -71,8 +71,8 @@ class MainView(ctk.CTkFrame):
         khung_dieu_khien = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
         khung_dieu_khien.grid(row=0, column=1, sticky="nsew")
 
-        khung_controls_inner = ctk.CTkFrame(khung_dieu_khien, fg_color="transparent", corner_radius=0, width=380)
-        khung_controls_inner.pack(fill="y", expand=True, padx=20, pady=20)
+        khung_controls_inner = ctk.CTkFrame(khung_dieu_khien, fg_color="transparent", corner_radius=0)
+        khung_controls_inner.pack(fill="both", expand=True, padx=20, pady=20)
         
         self.tao_khung_dieu_khien(khung_controls_inner)
 
@@ -150,7 +150,7 @@ class MainView(ctk.CTkFrame):
             height=32 
         )
         
-        self.btn_load_file.pack(fill="x", pady=4)
+        self.btn_load_file.pack(pady=4, fill="x", padx=10)
         self.lbl_puzzle_info = ctk.CTkLabel(
             khung_nap,
             text="Chưa nạp đề bài nào",
@@ -162,7 +162,7 @@ class MainView(ctk.CTkFrame):
         
 
         khung_kho = ctk.CTkFrame(khung_nap, fg_color="transparent")
-        khung_kho.pack(fill="x", pady=5)
+        khung_kho.pack(pady=5, fill="x", padx=10)
         khung_kho.grid_columnconfigure((0, 1), weight=1)
         
         self.btn_csv_easy = ctk.CTkButton(
@@ -213,13 +213,12 @@ class MainView(ctk.CTkFrame):
             font=ctk.CTkFont(size=13),
             values=['Backtracking (Baseline)', 'Forward Checking (Cải tiến)'],
             state="readonly",
-            height=30 
+            height=30
         )
-        combo_fast_solve.pack(fill="x", pady=(5, 5))
+        combo_fast_solve.pack(pady=(5, 5), fill="x", padx=10)
 
         khung_nut_hanh_dong = ctk.CTkFrame(khung_hanh_dong, fg_color="transparent")
-        khung_nut_hanh_dong.pack(fill="x")
-        khung_nut_hanh_dong.grid_columnconfigure((0, 1, 2), weight=1)
+        khung_nut_hanh_dong.pack(padx=10)
 
         self.btn_giai = ctk.CTkButton(
             khung_nut_hanh_dong, text="⚡ GIẢI",
@@ -227,7 +226,7 @@ class MainView(ctk.CTkFrame):
             fg_color="#28a745", hover_color="#32CD32", 
             text_color="#FFFFFF", height=35
         )
-        self.btn_giai.grid(row=0, column=0, sticky="ew", padx=(0, 3))
+        self.btn_giai.grid(row=0, column=0, padx=(0, 3))
         
         self.btn_sosanh = ctk.CTkButton(
             khung_nut_hanh_dong, text="📊 SO SÁNH",
@@ -235,7 +234,7 @@ class MainView(ctk.CTkFrame):
             fg_color="#8E44AD", hover_color="#A569BD", 
             text_color="#FFFFFF", height=35
         )
-        self.btn_sosanh.grid(row=0, column=1, sticky="ew", padx=3)
+        self.btn_sosanh.grid(row=0, column=1, padx=3)
 
         self.btn_xoa = ctk.CTkButton(
             khung_nut_hanh_dong, text="✕ XÓA",
@@ -243,14 +242,12 @@ class MainView(ctk.CTkFrame):
             fg_color="#E74C3C", hover_color="#EC7063", 
             text_color="#FFFFFF", height=35
         )
-        self.btn_xoa.grid(row=0, column=2, sticky="ew", padx=(3, 0))
+        self.btn_xoa.grid(row=0, column=2, padx=(3, 0))
 
     def tao_khung_che_do_demo(self, parent):
         
         khung_demo = ctk.CTkFrame(parent, fg_color="transparent")
         khung_demo.pack(fill="x", pady=10)
-        khung_demo.grid_columnconfigure(1, weight=1)
-        
         
         self.switch_demo_mode = ctk.CTkSwitch(
             khung_demo, text="Bật Demo Trực Quan Hóa", 
@@ -258,28 +255,28 @@ class MainView(ctk.CTkFrame):
             onvalue=True, offvalue=False, text_color="#e2e8f0",
             command=self.toggle_demo_widgets
         )
-        self.switch_demo_mode.grid(row=1, column=0, columnspan=2, sticky="w", padx=10)
+        self.switch_demo_mode.pack(pady=5, padx=10, anchor="w")
         
         self.slider_demo_speed = ctk.CTkSlider(khung_demo)
         self.slider_demo_speed.set(0.8) 
-        self.slider_demo_speed.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 5))
+        self.slider_demo_speed.pack(fill="x", padx=10, pady=(10, 5))
         
         self.lbl_demo_stats = ctk.CTkLabel(
             khung_demo, text="Số bước lui: 0",
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color="#F59E0B"
         )
-        self.lbl_demo_stats.grid(row=3, column=0, columnspan=2, pady=5)
+        self.lbl_demo_stats.pack(pady=5)
         
     def toggle_demo_widgets(self):
         is_on = self.switch_demo_mode.get()
         if is_on:
-            self.slider_demo_speed.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 5))
-            self.lbl_demo_stats.grid(row=3, column=0, columnspan=2, pady=5)
+            self.slider_demo_speed.pack(fill="x", padx=10, pady=(10, 5))
+            self.lbl_demo_stats.pack(pady=5)
             self.btn_giai.configure(text="▶ BẮT ĐẦU DEMO") 
         else:
-            self.slider_demo_speed.grid_remove()
-            self.lbl_demo_stats.grid_remove()
+            self.slider_demo_speed.pack_forget()
+            self.lbl_demo_stats.pack_forget()
             self.btn_giai.configure(text="⚡ GIẢI") 
     
     def set_controller_references(self):
@@ -409,6 +406,7 @@ class MainView(ctk.CTkFrame):
             messagebox.showinfo(title, message)
             
     def set_buttons_state_on_load(self):
+        self.btn_load_file.configure(state="normal")
         self.btn_csv_easy.configure(state="disabled")
         self.btn_csv_medium.configure(state="disabled")
         self.btn_csv_hard.configure(state="disabled")
@@ -418,6 +416,7 @@ class MainView(ctk.CTkFrame):
         self.btn_xoa.configure(state="disabled")
 
     def set_buttons_state_csv_loaded(self):
+        self.btn_load_file.configure(state="normal")
         self.btn_csv_easy.configure(state="normal")
         self.btn_csv_medium.configure(state="normal")
         self.btn_csv_hard.configure(state="normal")
@@ -427,6 +426,7 @@ class MainView(ctk.CTkFrame):
         self.btn_xoa.configure(state="disabled")
 
     def set_buttons_state_puzzle_on_grid(self, csv_loaded: bool):
+        self.btn_load_file.configure(state="normal")
         if csv_loaded:
             self.btn_csv_easy.configure(state="normal")
             self.btn_csv_medium.configure(state="normal")
@@ -449,7 +449,7 @@ class MainView(ctk.CTkFrame):
             self.btn_csv_medium.configure(state="disabled")
             self.btn_csv_hard.configure(state="disabled")
             self.btn_csv_extreme.configure(state="disabled")
-            self.btn_giai.configure(state="disabled")
+            self.btn_giai.configure(text="❚❚ DỪNG DEMO", state="normal", fg_color="#E74C3C", hover_color="#EC7063")
             self.btn_sosanh.configure(state="disabled")
             self.btn_xoa.configure(state="disabled")
             self.switch_demo_mode.configure(state="disabled")
@@ -458,6 +458,7 @@ class MainView(ctk.CTkFrame):
             self.switch_demo_mode.configure(state="normal")
             self.set_buttons_state_puzzle_on_grid(csv_loaded)
             self.toggle_demo_widgets()
+            self.btn_giai.configure(fg_color="#28a745", hover_color="#32CD32")
 
 
     def cap_nhat_o_visual(self, data: dict, puzzle_data: list):
@@ -473,22 +474,22 @@ class MainView(ctk.CTkFrame):
             o_nhap_lieu = self.cac_o_nhap[(r, c)]
             o_nhap_lieu.delete(0, "end")
             o_nhap_lieu.insert(0, str(num))
-            o_nhap_lieu.configure(border_color=MAU_O_THU, border_width=4)
+            o_nhap_lieu.configure(border_color=MAU_O_THU, border_width=5)
         
         elif action == "backtrack":
             r, c = data["cell"]
             o_nhap_lieu = self.cac_o_nhap[(r, c)]
             o_nhap_lieu.delete(0, "end")
-            o_nhap_lieu.configure(border_color=MAU_O_QUAY_LUI, border_width=4)
+            o_nhap_lieu.configure(border_color=MAU_O_QUAY_LUI, border_width=5)
             self.lbl_demo_stats.configure(text=f"Số bước lui: {data['stats']['backtracks']:,}")
 
         elif action == "prune_start":
             for (nr, nc) in data["neighbors"]:
                 if puzzle_data[nr][nc] == 0: 
-                    self.cac_o_nhap[(nr, nc)].configure(border_color=MAU_VIEN_HANG_XOM, border_width=3)
+                    self.cac_o_nhap[(nr, nc)].configure(border_color=MAU_VIEN_HANG_XOM, border_width=4)
                     
         elif action == "prune_fail":
-            self.cac_o_nhap[data["cell"]].configure(border_color=MAU_O_QUAY_LUI, border_width=4)
+            self.cac_o_nhap[data["cell"]].configure(border_color=MAU_O_QUAY_LUI, border_width=5)
 
         elif action == "restore_start":
             for (nr, nc) in data["neighbors"]:

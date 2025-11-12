@@ -4,9 +4,6 @@ import pandas as pd
 import random
 import os
 import copy
-import threading
-import queue
-import time
 from typing import TYPE_CHECKING, Type
 
 if TYPE_CHECKING:
@@ -23,7 +20,7 @@ class AppController:
         self.kaggle_df: pd.DataFrame = None 
         self.csv_loaded = False
         
-        self.visualizer_queue: queue.Queue = None
+        self.visualizer_generator = None 
         self.is_visualizer_running = False
         self.last_demo_status = None
         
@@ -55,6 +52,10 @@ class AppController:
         self.view.set_buttons_state_on_load()
     
     def handle_load_file(self):
+        if self.is_visualizer_running:
+            self.view.show_message("Lỗi", "Đang chạy Demo, không thể nạp file.", is_error=True)
+            return
+
         filepath = filedialog.askopenfilename(
             title="Chọn file CSV hoặc TXT",
             filetypes=[
@@ -220,7 +221,11 @@ class AppController:
         (algo_key, is_demo_mode) = self.view.get_selected_algorithm()
         
         if is_demo_mode:
-            self.run_visualizer(grid_data_to_solve, algo_key)
+            if self.is_visualizer_running:
+                self.is_visualizer_running = False
+                self._log("[DEMO] Đã dừng Demo.", "warning")
+            else:
+                self.run_visualizer(grid_data_to_solve, algo_key)
         else:
             self.run_fast_solve(grid_data_to_solve, algo_key)
 
@@ -326,6 +331,10 @@ class AppController:
         stats = {"backtracks": 0} 
         board_wrapper.start_timer()
         is_solved_or_generator = solve_func(board_wrapper, stats)
+        
+        if 'visualizer' in module_key:
+            return (board_wrapper, stats, is_solved_or_generator)
+
         board_wrapper.stop_timer()
         final_stats = board_wrapper.get_stats()
         final_stats.update(stats)
@@ -333,8 +342,12 @@ class AppController:
         return (board_wrapper, final_stats, is_solved_or_generator)
 
     def handle_clear(self):
+        if self.is_visualizer_running:
+            self.is_visualizer_running = False 
         if self.analysis_popup_window and self.analysis_popup_window.winfo_exists():
             self.analysis_popup_window.destroy() 
+
+        is_grid_manually_filled = (not self.current_puzzle_data) and (self.view and not self.view.is_grid_empty())
 
         if self.view:
             if self.current_puzzle_data:
@@ -347,7 +360,11 @@ class AppController:
                     self.view.set_buttons_state_csv_loaded()
                 else:
                     self.view.set_buttons_state_on_load()
-                self._log("[HỆ THỐNG] Đã xóa trắng lưới.", "green")
+                
+                if is_grid_manually_filled:
+                     self._log("[HỆ THỐNG] Đã xóa lưới (nhập tay).", "green")
+                else:
+                     self._log("[HỆ THỐNG] Đã xóa trắng lưới.", "green")
 
     def handle_grid_modified(self, event=None):
         self.current_puzzle_data = None
@@ -366,9 +383,6 @@ class AppController:
         self._log("[HỆ THỐNG] Đã phát hiện sửa đổi.", "warning")
 
     def run_visualizer(self, grid_data, algo_name: str):
-        if self.is_visualizer_running:
-            return
-
         if self.view: 
             self.view.load_puzzle_to_grid(grid_data) 
             self.view.set_buttons_state_visualizing(True, self.csv_loaded)
@@ -378,75 +392,78 @@ class AppController:
         board_wrapper, _stats, generator = self._run_single_algo(
             grid_data, algo_name, algo_key
         )
-        self.visualizer_queue = queue.Queue()
+        self.visualizer_generator = generator
+        self.current_visual_board = board_wrapper
+        
         self.is_visualizer_running = True
-        self.last_demo_status = None 
-        
-        threading.Thread(
-            target=self._run_visualizer_worker, 
-            args=(generator, self.visualizer_queue, _stats), 
-            daemon=True
-        ).start()
-        
-        if self.view:
-            self.view.root.after(50, self._check_visualizer_queue)
+        self.last_demo_status = None
         
         algo_full_name = "Forward Checking" if algo_key == 'fc' else "Backtracking"
         self._log(f"[DEMO] Bắt đầu Demo {algo_full_name}...", "cyan")
+        self.step_visualizer()
 
-    def _run_visualizer_worker(self, generator, visualizer_queue, stats):
-        try:
-            for data in generator:
-                visualizer_queue.put(data)
-                time.sleep(0.001)
-            
-            visualizer_queue.put({"status": "finished", "stats": stats})
-        except Exception as e:
-            visualizer_queue.put({"status": "failed", "message": str(e)})
-
-    def _check_visualizer_queue(self):
+    def step_visualizer(self):
         if not self.is_visualizer_running:
+            self.visualizer_generator = None
+            self.current_visual_board = None
+            if self.view:
+                self.view.set_buttons_state_visualizing(False, self.csv_loaded)
             return
-
+            
         try:
-            data = self.visualizer_queue.get_nowait()
+            data = next(self.visualizer_generator)
+            if self.view and self.current_puzzle_data:
+                self.view.cap_nhat_o_visual(data, self.current_puzzle_data)
             
-            if "status" in data:
-                status = data["status"]
-                if status == "solved":
-                    self.last_demo_status = "solved"
-                elif status == "failed":
-                    self.last_demo_status = "failed"
-                    self._log(f"[DEMO] Thất bại: {data.get('message')}", "fail")
-                elif status == "finished":
-                    self._visualizer_finished()
-                    return
-            else:
-                if self.view and self.current_puzzle_data:
-                    self.view.cap_nhat_o_visual(data, self.current_puzzle_data)
-            
-        except queue.Empty:
-            pass
-        
-        if self.view:
-            delay = self.view.get_demo_speed()
-            self.view.root.after(delay, self._check_visualizer_queue)
-
-    def _visualizer_finished(self):
-        self.is_visualizer_running = False
-        
-        if self.last_demo_status == "solved":
-            if self.current_known_solution:
-                if self.current_visual_board and self.current_visual_board.get_board() == self.current_known_solution:
-                    self._log("[DEMO] Demo xong! Đã xác minh 100%!", "green")
+            status = data.get("status")
+            if status == "solved":
+                self.is_visualizer_running = False
+                self.last_demo_status = "solved"
+                if self.current_known_solution:
+                    if self.current_visual_board and self.current_visual_board.get_board() == self.current_known_solution:
+                         self._log("[DEMO] Demo xong! Đã xác minh 100%!", "green")
+                    else:
+                         self._log("[DEMO] Demo xong! LỖI XÁC MINH!", "fail")
                 else:
-                    self._log("[DEMO] Demo xong! LỖI XÁC MINH!", "fail")
-            else:
-                self._log("[DEMO] Đã tìm thấy lời giải!", "green")
-        elif self.last_demo_status == "failed":
-            pass
-        else:
-            self._log("[DEMO] Không tìm thấy lời giải!", "fail")
+                    self._log("[DEMO] Demo hoàn tất: Đã tìm thấy lời giải!", "green")
+
+                self.visualizer_generator = None
+                self.current_visual_board = None
+                if self.view:
+                    self.view.set_buttons_state_visualizing(False, self.csv_loaded)
+                return
+                
+            elif status == "failed":
+                self.is_visualizer_running = False
+                self.last_demo_status = "failed"
+                self._log(f"[DEMO] Thất bại: {data.get('message')}", "fail")
+                self.visualizer_generator = None
+                self.current_visual_board = None
+                if self.view:
+                    self.view.set_buttons_state_visualizing(False, self.csv_loaded)
+                return
             
-        if self.view:
-            self.view.set_buttons_state_visualizing(False, self.csv_loaded)
+            if self.view:
+                delay_ms = self.view.get_demo_speed()
+                self.view.root.after(delay_ms, self.step_visualizer)
+            else:
+                self.is_visualizer_running = False
+            
+        except StopIteration:
+            self.is_visualizer_running = False
+            self.last_demo_status = "stop_iteration"
+            self._log("[DEMO] Không tìm thấy lời giải!", "fail")
+            self.visualizer_generator = None
+            self.current_visual_board = None
+            if self.view:
+                self.view.set_buttons_state_visualizing(False, self.csv_loaded)
+        except Exception as e:
+            self.is_visualizer_running = False
+            self.last_demo_status = "exception"
+            if self.view:
+                self.view.show_message("Lỗi Demo", f"Lỗi nghiêm trọng: {traceback.format_exc()}", is_error=True)
+            self._log(f"[DEMO] Lỗi: {e}", "fail")
+            self.visualizer_generator = None
+            self.current_visual_board = None
+            if self.view:
+                self.view.set_buttons_state_visualizing(False, self.csv_loaded)

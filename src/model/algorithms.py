@@ -2,9 +2,6 @@
 from .sudoku_board import SudokuBoard
 import copy 
 
-# -----------------------------------------------------------------
-# (PHẦN CỦA VAI TRÒ 1 - ĐÃ HOÀN THÀNH)
-# -----------------------------------------------------------------
 
 def solve_backtracking(board_wrapper: SudokuBoard, stats: dict):
     """
@@ -43,9 +40,6 @@ def solve_backtracking(board_wrapper: SudokuBoard, stats: dict):
     # 4. Nếu thử hết 9 số mà không số nào hợp lệ
     return False  # Kích hoạt quay lui ở cấp đệ quy cao hơn
 
-# -----------------------------------------------------------------
-# (PHẦN CỦA VAI TRÒ 2 - BẠN ĐANG THỰC HIỆN)
-# -----------------------------------------------------------------
 
 def solve_forward_checking(board_wrapper: SudokuBoard, stats: dict):
     """
