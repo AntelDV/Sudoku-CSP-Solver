@@ -35,9 +35,11 @@ def main():
     }
     
     root = ctk.CTk()
-    root.geometry("1000x700") 
-    root.title("Công cụ Phân tích Thuật toán Sudoku (Đồ án TTNT)")
+    root.geometry("1020x720") 
+    root.title("Ứng dụng CSP vào giải Sudoku")
     root.resizable(True, True) 
+    
+    root.minsize(1020, 720)
     
 
     controller = AppController(model, AnalysisPopup) 
