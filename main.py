@@ -14,7 +14,6 @@ from src.view.analysis_popup import AnalysisPopup
 from src.view.batch_analysis_popup import BatchAnalysisPopup 
 from src.controller.app_controller import AppController
 from src.model.sudoku_board import SudokuBoard
-
 from src.model import algorithms
 from src.model import visualizer_bt
 from src.model import visualizer_fc
@@ -23,7 +22,7 @@ from src.model import profiler_fc
 from src.model import profiler_mrv 
 
 def main():
-    
+
     # Cấu hình giao diện CustomTkinter
     ctk.set_appearance_mode("dark")  
     ctk.set_default_color_theme("blue") 
@@ -44,11 +43,16 @@ def main():
     root.resizable(True, True) 
     root.minsize(1020, 720)
     
-    controller = AppController(model, AnalysisPopup, BatchAnalysisPopup) 
-    
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    controller = AppController(model, AnalysisPopup, BatchAnalysisPopup, base_dir) 
+
     view = MainView(root, controller)
-    view.pack(fill="both", expand=True)     
-    controller.set_view(view)    
+    view.pack(fill="both", expand=True) 
+    controller.set_view(view)
     root.mainloop()
 
 if __name__ == "__main__":

@@ -28,7 +28,7 @@ class AnalysisPopup(ctk.CTkToplevel):
         self.grid_data = grid_data 
         self.stats_mrv = None 
         
-        self.title("Báo cáo Phân tích So sánh (Đơn lẻ)")
+        self.title("Phân tích So sánh trên cùng 1 bài toán")
         self.geometry("700x350") 
 
         self.grid_columnconfigure(0, weight=1)

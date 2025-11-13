@@ -14,16 +14,22 @@ if TYPE_CHECKING:
     from src.view.batch_analysis_popup import BatchAnalysisPopup
 
 class AppController:
-    def __init__(self, model, analysis_popup_class: Type['AnalysisPopup'], batch_analysis_popup_class: Type['BatchAnalysisPopup']):
+
+    def __init__(self, model, analysis_popup_class: Type['AnalysisPopup'], batch_analysis_popup_class: Type['BatchAnalysisPopup'], base_dir: str):
         """
         Khởi tạo Controller.
         
         :param model: Dictionary chứa các lớp và mô-đun của Model.
         :param analysis_popup_class: Lớp View cho cửa sổ "So sánh".
         :param batch_analysis_popup_class: Lớp View cho cửa sổ "Thực nghiệm Hàng loạt".
+        :param base_dir: Đường dẫn gốc của ứng dụng (do main.py cung cấp).
         """
         self.model_classes = model  
         self.view: 'MainView' = None
+        
+        # Lưu đường dẫn gốc và đường dẫn thư mục 'data'
+        self.base_dir = base_dir
+        self.data_dir = os.path.join(self.base_dir, "data")
         
         # Quản lý các lớp View của cửa sổ Popup
         self.analysis_popup_class = analysis_popup_class
@@ -60,7 +66,6 @@ class AppController:
             print(message)
 
     def set_view(self, view: 'MainView'):
-        """Liên kết Controller với View chính khi ứng dụng khởi chạy."""
         self.view = view
         self.view.set_buttons_state_on_load()
     
@@ -70,9 +75,15 @@ class AppController:
             self.view.show_message("Lỗi", "Đang chạy Demo, không thể nạp file.", is_error=True)
             return
 
+        # Ưu tiên mở thư mục 'data' nếu nó tồn tại
+        initial_dir = self.base_dir
+        if os.path.isdir(self.data_dir):
+            initial_dir = self.data_dir
+
         # 1. Mở hộp thoại để chọn file .csv hoặc .txt
         filepath = filedialog.askopenfilename(
             title="Chọn file CSV hoặc TXT",
+            initialdir=initial_dir,  # Mở hộp thoại tại thư mục 'data'
             filetypes=[
                 ("Data Files", "*.csv *.txt"),
                 ("CSV files", "*.csv"),
@@ -131,6 +142,7 @@ class AppController:
                 raise ValueError("Định dạng file không được hỗ trợ (chỉ .csv hoặc .txt).")
 
         except Exception as e:
+            # Xử lý nếu nạp file thất bại
             self.kaggle_df = None
             self.csv_loaded = False
             self.current_puzzle_data = None
@@ -175,6 +187,7 @@ class AppController:
                 df_filtered = self.kaggle_df[self.kaggle_df['clues'] > 35]
 
             if df_filtered is None or df_filtered.empty:
+                self._log("[HỆ THỐNG] Không tìm thấy đề, lấy ngẫu nhiên.", "warning")
                 if self.view: self.view.show_message("Lỗi Lọc", f"Không tìm thấy bất kỳ đề nào. Lấy ngẫu nhiên.", is_error=True)
                 df_filtered = self.kaggle_df 
             
@@ -182,6 +195,7 @@ class AppController:
             random_row = df_filtered.sample(n=1).iloc[0]
             puzzle_string = str(random_row[puzzle_col])
             
+            # Lưu lại lời giải (để xác minh)
             solution_string = str(random_row[solution_col])
             self.current_known_solution = self._string_to_grid(solution_string)
             
@@ -268,8 +282,9 @@ class AppController:
         return "".join(str(cell) for row in grid for cell in row)
 
     def run_fast_solve(self, grid_data, algo_key: str):
-        """Chạy thuật toán ở chế độ 'Giải nhanh'."""
+        """Chạy thuật toán ở chế độ 'Giải nhanh' ."""
         
+        # Ánh xạ key từ View sang key của Model 
         if algo_key == 'bt':
             module_key = 'profiler_bt'
             algo_name = "Backtracking"
@@ -287,7 +302,7 @@ class AppController:
         
         if self.view: self.view.set_buttons_state_visualizing(True, self.csv_loaded)
         
-        # Chạy thuật toán (phiên bản profiler)
+        # Chạy thuật toán 
         board_wrapper, stats, is_solved = self._run_single_algo(
             grid_data, module_key, algo_key 
         )
@@ -320,6 +335,7 @@ class AppController:
         if self.is_visualizer_running:
             if self.view: self.view.show_message("Lỗi", "Đang chạy Demo, không thể so sánh.", is_error=True)
             return
+        # Nếu cửa sổ đã mở, đưa nó lên trước
         if self.analysis_popup_window and self.analysis_popup_window.winfo_exists():
             self.analysis_popup_window.focus() 
             return
@@ -369,7 +385,7 @@ class AppController:
             self._log(f"[LỖI] {e}", "fail")
 
     def handle_batch_compare_setup(self):
-        """Xử lý nhấn nút 'Cài đặt' (⚙️)."""
+        """Xử lý nhấn nút 'Cài đặt' (⚙️)"""
         if self.is_visualizer_running:
             self.view.show_message("Lỗi", "Đang chạy Demo, không thể chạy thực nghiệm.", is_error=True)
             return
@@ -394,13 +410,14 @@ class AppController:
         """
         self._log(f"[THỰC NGHIỆM] Bắt đầu chạy thực nghiệm hàng loạt (N={n_value})...", "header")
         
+        # Vô hiệu hóa các nút khi đang chạy
         self.view.set_buttons_state_visualizing(True, self.csv_loaded)
         self.view.btn_giai.configure(text="⚡ GIẢI", state="disabled")
 
         thread = threading.Thread(
             target=self._run_batch_analysis_thread, 
             args=(n_value, popup_instance),
-            daemon=True 
+            daemon=True # Tự động tắt thread khi thoát ứng dụng
         )
         thread.start()
 
@@ -410,6 +427,7 @@ class AppController:
         hàng loạt N đề bài.
         """
         try:
+            # Định nghĩa các khoảng độ khó
             difficulty_ranges = {
                 'Dễ': (36, 99),
                 'Trung bình': (30, 35),
@@ -440,7 +458,7 @@ class AppController:
                     df_sample = df_filtered
                 else:
                     actual_N = N
-                    df_sample = df_filtered.sample(n=N, random_state=1) 
+                    df_sample = df_filtered.sample(n=N, random_state=1) # Dùng random_state để kết quả lặp lại được
 
                 # 2. Chuẩn bị biến tổng hợp
                 bt_stats_sum = {'time': 0, 'backtracks': 0, 'nodes': 0}
@@ -448,7 +466,7 @@ class AppController:
 
                 # 3. Lặp qua các đề đã lấy mẫu
                 for index, row in df_sample.iterrows():
-                    # Cập nhật GUI (phải dùng `root.after` vì đây là thread khác)
+                    # Cập nhật GUI 
                     tasks_done += 1
                     progress_text = f"Đang xử lý: {diff_name} ({tasks_done}/{total_tasks})"
                     progress_perc = tasks_done / total_tasks
@@ -473,7 +491,7 @@ class AppController:
                     fc_stats_sum['nodes'] += fc_stats.get('nodes_visited', 0)
                     fc_stats_sum['prunes'] += fc_stats.get('prunes_made', 0)
                     
-                    time.sleep(0.001) 
+                    time.sleep(0.001)
                 
                 if actual_N == 0: continue
 
@@ -496,18 +514,17 @@ class AppController:
             self.view.root.after(0, popup.on_analysis_complete, final_results)
 
         except Exception as e:
+            # Xử lý lỗi nghiêm trọng trong Thread
             self._log(f"[THỰC NGHIỆM] LỖI NGHIÊM TRỌNG: {traceback.format_exc()}", "fail")
             self.view.root.after(0, popup.destroy) 
             self.view.root.after(0, self.view.show_message, "Lỗi Thực nghiệm", f"Đã xảy ra lỗi: {e}", True)
         
         finally:
-            # Bật lại các nút
+            # Luôn luôn bật lại các nút, dù thành công hay thất bại
             self.view.root.after(0, self.view.set_buttons_state_visualizing, False, self.csv_loaded)
 
     def _run_single_algo(self, grid_data, module_key: str, algo_key: str):
-        """
-        Chạy một thuật toán duy nhất.
-        
+        """        
         Hàm này sẽ chọn đúng module (profiler, visualizer) và
         đúng hàm (bt, fc, fc_mrv) để thực thi.
         
@@ -518,7 +535,7 @@ class AppController:
         """
         SudokuBoard_class = self.model_classes['SudokuBoard']
         
-        # 1. Xác định module
+        # 1. Xác định module (profiler, visualizer, ...)
         if 'profiler' in module_key:
             module = self.model_classes[module_key]
         elif 'visualizer' in module_key:
@@ -526,7 +543,7 @@ class AppController:
         else:
             module = self.model_classes['algorithms']
 
-        # 2. Xác định hàm
+        # 2. Xác định hàm (bt, fc, fc_mrv)
         solve_func = None
         if algo_key == 'bt':
             if 'profiler' in module_key:
@@ -573,6 +590,7 @@ class AppController:
 
     def handle_clear(self):
         """Xử lý sự kiện nhấn nút 'Xóa'."""
+        # Dừng mọi tiến trình đang chạy
         if self.is_visualizer_running:
             self.is_visualizer_running = False 
         if self.analysis_popup_window and self.analysis_popup_window.winfo_exists():
@@ -661,7 +679,7 @@ class AppController:
         
         algo_key = 'fc' if 'fc' in algo_name else 'bt' 
         
-        # Chạy thuật toán (phiên bản visualizer)
+        # Chạy thuật toán 
         board_wrapper, _stats, generator = self._run_single_algo(
             grid_data, algo_name, algo_key
         )
@@ -669,7 +687,7 @@ class AppController:
         self.current_visual_board = board_wrapper
         
         self.is_visualizer_running = True
-        self.last_demo_status = None
+        self.last_demo_status = None 
         
         algo_full_name = "Forward Checking" if algo_key == 'fc' else "Backtracking"
         self._log(f"[DEMO] Bắt đầu Demo {algo_full_name}...", "cyan")
@@ -700,7 +718,7 @@ class AppController:
             if status == "solved":
                 # Demo thành công
                 self.is_visualizer_running = False
-                self.last_demo_status = "solved"
+                self.last_demo_status = "solved" # Lưu trạng thái
                 if self.current_known_solution:
                     if self.current_visual_board and self.current_visual_board.get_board() == self.current_known_solution:
                          self._log("[DEMO] Demo xong! Đã xác minh 100%!", "green")
@@ -718,7 +736,7 @@ class AppController:
             elif status == "failed":
                 # Đề bài không hợp lệ
                 self.is_visualizer_running = False
-                self.last_demo_status = "failed"
+                self.last_demo_status = "failed" # Lưu trạng thái
                 self._log(f"[DEMO] Thất bại: {data.get('message')}", "fail")
                 self.visualizer_generator = None
                 self.current_visual_board = None
@@ -736,11 +754,12 @@ class AppController:
         except StopIteration:
             # Generator đã kết thúc nhưng không tìm thấy lời giải
             self.is_visualizer_running = False
-            self.last_demo_status = "stop_iteration"
+            self.last_demo_status = "stop_iteration" # Lưu trạng thái
             self._log("[DEMO] Không tìm thấy lời giải!", "fail")
             
             if self.view and self.current_puzzle_data:
-                final_data = {'status': 'failed', 'stats': {'backtracks': self.view.current_backtracks}}
+                # Cập nhật lần cuối cho thống kê
+                final_data = {'status': 'failed', 'stats': stats}
                 self.view.cap_nhat_o_visual(final_data, self.current_puzzle_data)
                 
             self.visualizer_generator = None
@@ -751,7 +770,7 @@ class AppController:
         except Exception as e:
             # Lỗi nghiêm trọng
             self.is_visualizer_running = False
-            self.last_demo_status = "exception"
+            self.last_demo_status = "exception" # Lưu trạng thái
             if self.view:
                 self.view.show_message("Lỗi Demo", f"Lỗi nghiêm trọng: {traceback.format_exc()}", is_error=True)
             self._log(f"[DEMO] Lỗi: {e}", "fail")

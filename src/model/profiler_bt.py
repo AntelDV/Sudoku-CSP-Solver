@@ -49,4 +49,3 @@ def _solve_bt_recursive(board_wrapper: SudokuBoard, stats: dict):
             
     # 4. Thử hết 9 số thất bại
     return False
-}

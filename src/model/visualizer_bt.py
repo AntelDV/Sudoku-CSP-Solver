@@ -60,4 +60,3 @@ def solve_backtracking_visual(board_wrapper: SudokuBoard, stats: dict):
 
     # 4. Nếu thử hết 9 số mà không số nào hợp lệ
     return False # Kích hoạt quay lui ở cấp cao hơn
-}

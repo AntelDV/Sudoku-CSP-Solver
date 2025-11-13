@@ -176,4 +176,3 @@ def _restore_neighbors_visual(domains, pruned_log):
     # Thực hiện khôi phục
     for (r, c, num) in pruned_log:
         domains[r][c].add(num)
-}
