@@ -11,13 +11,16 @@ except ImportError:
 
 from src.view.main_window import MainView
 from src.view.analysis_popup import AnalysisPopup 
+from src.view.batch_analysis_popup import BatchAnalysisPopup 
 from src.controller.app_controller import AppController
 from src.model.sudoku_board import SudokuBoard
 from src.model import algorithms
+from src.model import algorithms_mrv # Thêm MRV solve
 from src.model import visualizer_bt
 from src.model import visualizer_fc
 from src.model import profiler_bt
 from src.model import profiler_fc
+from src.model import profiler_mrv # Thêm MRV profile
 
 def main():
     """Hàm chính khởi chạy ứng dụng MVC."""
@@ -28,10 +31,12 @@ def main():
     model = {
         'SudokuBoard': SudokuBoard,
         'algorithms': algorithms,
+        'algorithms_mrv': algorithms_mrv, # Thêm
         'visualizer_bt': visualizer_bt,
         'visualizer_fc': visualizer_fc,
         'profiler_bt': profiler_bt,
         'profiler_fc': profiler_fc,
+        'profiler_mrv': profiler_mrv, # Thêm
     }
     
     root = ctk.CTk()
@@ -41,8 +46,8 @@ def main():
     
     root.minsize(1020, 720)
     
-
-    controller = AppController(model, AnalysisPopup) 
+    # Truyền cả 2 lớp Popup vào Controller
+    controller = AppController(model, AnalysisPopup, BatchAnalysisPopup) 
     view = MainView(root, controller)
     view.pack(fill="both", expand=True) 
     

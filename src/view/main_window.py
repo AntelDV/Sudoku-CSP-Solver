@@ -18,11 +18,13 @@ MAU_O_GIAI_TEXT = ("#000000", "#000000")
 
 MAU_VIEN_3x3 = ("#000000", "#000000") 
 MAU_VIEN_LUOI = ("#000000", "#000000") 
+MAU_O_LOI = "#E74C3C" # Màu viền đỏ khi nhập sai
 
-MAU_VIEN_HIEN_TAI = "#F1C40F" 
-MAU_O_THU = "#2ECC71"       
-MAU_O_QUAY_LUI = "#E74C3C"  
-MAU_VIEN_HANG_XOM = "#3498DB" 
+# Đây là vị trí bạn có thể tự đổi màu
+MAU_O_THU = "#28A745"       # Xanh lá đậm (Đang thử)
+MAU_O_QUAY_LUI = "#E74C3C"  # Đỏ đậm (Quay lui)
+MAU_VIEN_HANG_XOM = "#3498DB" # Xanh dương (Đang cắt tỉa)
+MAU_VIEN_KHOI_PHUC = "#95A5A6" # Xám (Khôi phục)
 
 
 class MainView(ctk.CTkFrame):
@@ -48,6 +50,12 @@ class MainView(ctk.CTkFrame):
         self.btn_giai = None
         self.btn_sosanh = None
         self.btn_xoa = None
+        self.btn_batch_analysis = None # Nút setting mới
+        
+        # Frame và Label cho kết quả giải nhanh (Mới)
+        self.khung_ket_qua_nhanh = None
+        self.lbl_fast_solve_time = None
+        self.lbl_fast_solve_backtracks = None
         
         self.vcmd = (self.root.register(self.kiem_tra_nhap_lieu), '%P')
         
@@ -111,18 +119,39 @@ class MainView(ctk.CTkFrame):
                             padx=(1,0), pady=(1,0) 
                         )
                         self.cac_o_nhap[(hang_toan_cuc, cot_toan_cuc)] = o_nhap_lieu
-                        o_nhap_lieu.bind("<KeyRelease>", self.controller.handle_grid_modified)
-
+                        
+                        # CẬP NHẬT BINDING: Truyền (event, r, c)
+                        o_nhap_lieu.bind(
+                            "<KeyRelease>", 
+                            lambda event, r=hang_toan_cuc, c=cot_toan_cuc: 
+                                self.controller.handle_grid_modified(event, r, c)
+                        )
 
     
-    def tao_khung_dieu_khien(self, parent):    
+    def tao_khung_dieu_khien(self, parent):
+        # Khung tiêu đề chứa cả Tiêu đề và Nút Cài đặt
+        khung_tieu_de = ctk.CTkFrame(parent, fg_color="transparent")
+        khung_tieu_de.pack(fill="x", pady=(10, 5))
+        khung_tieu_de.grid_columnconfigure(0, weight=1)
+        khung_tieu_de.grid_columnconfigure(1, weight=0) # Cột cho nút
+        
         ctk.CTkLabel(
-            parent, 
+            khung_tieu_de, 
             text="SUDOKU SOLVER", 
             font=ctk.CTkFont(size=36, weight="bold"),
             text_color="#38bdf8"
-        ).pack(pady=(10, 5))
+        ).grid(row=0, column=0, sticky="ew", padx=(45, 0)) # Pad trái để cân
         
+        self.btn_batch_analysis = ctk.CTkButton(
+            khung_tieu_de,
+            text="⚙️", # Icon Cài đặt
+            font=ctk.CTkFont(size=24),
+            width=35,
+            height=35,
+            fg_color="transparent", # XÓA NỀN NÚT
+            hover_color="#475569"
+        )
+        self.btn_batch_analysis.grid(row=0, column=1, sticky="e", padx=(0, 20))
         
         self.tao_khung_nap_de(parent)
         ctk.CTkFrame(parent, height=2, fg_color="#334155").pack(fill="x", padx=0, pady=10)
@@ -150,7 +179,7 @@ class MainView(ctk.CTkFrame):
             height=32 
         )
         
-        self.btn_load_file.pack(pady=4, fill="x", padx=10)
+        self.btn_load_file.pack(pady=4)
         self.lbl_puzzle_info = ctk.CTkLabel(
             khung_nap,
             text="Chưa nạp đề bài nào",
@@ -162,7 +191,7 @@ class MainView(ctk.CTkFrame):
         
 
         khung_kho = ctk.CTkFrame(khung_nap, fg_color="transparent")
-        khung_kho.pack(pady=5, fill="x", padx=10)
+        khung_kho.pack(pady=5)
         khung_kho.grid_columnconfigure((0, 1), weight=1)
         
         self.btn_csv_easy = ctk.CTkButton(
@@ -172,7 +201,7 @@ class MainView(ctk.CTkFrame):
             text_color="#FFFFFF",
             height=28
         )
-        self.btn_csv_easy.grid(row=0, column=0, sticky="ew", padx=(0, 3), pady=2)
+        self.btn_csv_easy.grid(row=0, column=0, padx=(0, 3), pady=2)
         
         self.btn_csv_medium = ctk.CTkButton(
             khung_kho, text="Lấy Đề Trung Bình",
@@ -181,7 +210,7 @@ class MainView(ctk.CTkFrame):
             text_color="#000000",
             height=28
         )
-        self.btn_csv_medium.grid(row=0, column=1, sticky="ew", padx=(3, 0), pady=2)
+        self.btn_csv_medium.grid(row=0, column=1, padx=(3, 0), pady=2)
         
         self.btn_csv_hard = ctk.CTkButton(
             khung_kho, text="Lấy Đề Khó",
@@ -190,7 +219,7 @@ class MainView(ctk.CTkFrame):
             text_color="#FFFFFF",
             height=28
         )
-        self.btn_csv_hard.grid(row=1, column=0, sticky="ew", padx=(0, 3), pady=2)
+        self.btn_csv_hard.grid(row=1, column=0, padx=(0, 3), pady=2)
         
         self.btn_csv_extreme = ctk.CTkButton(
             khung_kho, text="Lấy Đề Siêu Khó",
@@ -199,7 +228,7 @@ class MainView(ctk.CTkFrame):
             text_color="#FFFFFF",
             height=28
         )
-        self.btn_csv_extreme.grid(row=1, column=1, sticky="ew", padx=(3, 0), pady=2)
+        self.btn_csv_extreme.grid(row=1, column=1, padx=(3, 0), pady=2)
         
     def tao_khung_hanh_dong(self, parent):
         khung_hanh_dong = ctk.CTkFrame(parent, fg_color="transparent")
@@ -211,28 +240,33 @@ class MainView(ctk.CTkFrame):
             khung_hanh_dong,
             variable=self.algo_var, 
             font=ctk.CTkFont(size=13),
-            values=['Backtracking (Baseline)', 'Forward Checking (Cải tiến)'],
+            values=['Backtracking (Baseline)', 
+                    'Forward Checking (Cải tiến)',
+                    'FC + MRV (Nâng cao)'], # <-- THÊM MRV VÀO ĐÂY
             state="readonly",
-            height=30
+            height=30,
+            width=220
         )
-        combo_fast_solve.pack(pady=(5, 5), fill="x", padx=10)
+        combo_fast_solve.pack(pady=(5, 5))
 
         khung_nut_hanh_dong = ctk.CTkFrame(khung_hanh_dong, fg_color="transparent")
-        khung_nut_hanh_dong.pack(padx=10)
+        khung_nut_hanh_dong.pack()
 
         self.btn_giai = ctk.CTkButton(
             khung_nut_hanh_dong, text="⚡ GIẢI",
             font=ctk.CTkFont(size=14, weight="bold"),
             fg_color="#28a745", hover_color="#32CD32", 
-            text_color="#FFFFFF", height=35
+            text_color="#FFFFFF", height=35,
+            width=105
         )
         self.btn_giai.grid(row=0, column=0, padx=(0, 3))
         
         self.btn_sosanh = ctk.CTkButton(
-            khung_nut_hanh_dong, text="📊 SO SÁNH",
+            khung_nut_hanh_dong, text="📊 SO SÁNH", # Trả lại tên cũ
             font=ctk.CTkFont(size=14, weight="bold"),
             fg_color="#8E44AD", hover_color="#A569BD", 
-            text_color="#FFFFFF", height=35
+            text_color="#FFFFFF", height=35,
+            width=105
         )
         self.btn_sosanh.grid(row=0, column=1, padx=3)
 
@@ -240,9 +274,47 @@ class MainView(ctk.CTkFrame):
             khung_nut_hanh_dong, text="✕ XÓA",
             font=ctk.CTkFont(size=14, weight="bold"),
             fg_color="#E74C3C", hover_color="#EC7063", 
-            text_color="#FFFFFF", height=35
+            text_color="#FFFFFF", height=35,
+            width=105
         )
         self.btn_xoa.grid(row=0, column=2, padx=(3, 0))
+        
+        # --- KHUNG KẾT QUẢ GIẢI NHANH (MỚI) ---
+        self.khung_ket_qua_nhanh = ctk.CTkFrame(khung_hanh_dong, fg_color="transparent")
+        
+        self.lbl_fast_solve_time = ctk.CTkLabel(
+            self.khung_ket_qua_nhanh, 
+            text="Thời gian: 0.00s", 
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#3498DB" # Xanh dương
+        )
+        self.lbl_fast_solve_time.pack(pady=(10, 2))
+        
+        self.lbl_fast_solve_backtracks = ctk.CTkLabel(
+            self.khung_ket_qua_nhanh, 
+            text="Số bước lui: 0", 
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#F59E0B" # Vàng cam
+        )
+        self.lbl_fast_solve_backtracks.pack(pady=(2, 5))
+        
+        # Khung này được .pack() và .pack_forget() bởi các hàm bên dưới
+
+    def show_fast_solve_stats(self, stats: dict):
+        """Hiển thị thống kê giải nhanh."""
+        time_val = stats.get('execution_time_sec', 0)
+        backtracks_val = stats.get('backtracks', 0)
+        
+        self.lbl_fast_solve_time.configure(text=f"Thời gian thực thi: {time_val:.6f} s")
+        self.lbl_fast_solve_backtracks.configure(text=f"Số bước quay lui: {backtracks_val:,}")
+        
+        self.khung_ket_qua_nhanh.pack(fill="x", pady=(5,0))
+
+    def clear_fast_solve_stats(self):
+        """Ẩn thống kê giải nhanh."""
+        self.khung_ket_qua_nhanh.pack_forget()
+        
+    # --- KẾT THÚC KHUNG KẾT QUẢ ---
 
     def tao_khung_che_do_demo(self, parent):
         
@@ -259,10 +331,10 @@ class MainView(ctk.CTkFrame):
         
         self.slider_demo_speed = ctk.CTkSlider(khung_demo)
         self.slider_demo_speed.set(0.8) 
-        self.slider_demo_speed.pack(fill="x", padx=10, pady=(10, 5))
+        self.slider_demo_speed.pack(pady=(10, 5))
         
         self.lbl_demo_stats = ctk.CTkLabel(
-            khung_demo, text="Số bước lui: 0",
+            khung_demo, text="Số bước lui: 0", # Bỏ đồng hồ
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color="#F59E0B"
         )
@@ -271,7 +343,7 @@ class MainView(ctk.CTkFrame):
     def toggle_demo_widgets(self):
         is_on = self.switch_demo_mode.get()
         if is_on:
-            self.slider_demo_speed.pack(fill="x", padx=10, pady=(10, 5))
+            self.slider_demo_speed.pack(pady=(10, 5))
             self.lbl_demo_stats.pack(pady=5)
             self.btn_giai.configure(text="▶ BẮT ĐẦU DEMO") 
         else:
@@ -287,18 +359,30 @@ class MainView(ctk.CTkFrame):
         self.btn_csv_extreme.configure(command=lambda: self.controller.handle_get_csv_puzzle('extreme'))
         
         self.btn_giai.configure(command=self.controller.handle_solve)
-        self.btn_sosanh.configure(command=self.controller.handle_compare)
+        self.btn_sosanh.configure(command=self.controller.handle_compare) # Hoàn nguyên
         self.btn_xoa.configure(command=self.controller.handle_clear)
+        self.btn_batch_analysis.configure(command=self.controller.handle_batch_compare_setup) # Nút mới
 
     def get_selected_algorithm(self) -> (str, bool):
         selected = self.algo_var.get()
         is_demo = self.switch_demo_mode.get()
-        is_fc = "Forward Checking" in selected
         
-        if is_demo:
-            return ("visualizer_fc" if is_fc else "visualizer_bt"), True
+        # CẬP NHẬT LOGIC ĐỂ TRẢ VỀ KEY MỚI
+        if "FC + MRV" in selected:
+            algo_key = "fc_mrv"
+        elif "Forward Checking" in selected:
+            algo_key = "fc"
         else:
-            return ("fc" if is_fc else "bt"), False
+            algo_key = "bt"
+            
+        if is_demo:
+            # Tạm thời chưa có demo cho MRV, dùng demo FC thay thế
+            if algo_key == "fc_mrv":
+                return "visualizer_fc", True
+            
+            return ("visualizer_fc" if algo_key == "fc" else "visualizer_bt"), True
+        else:
+            return algo_key, False
     
     def get_demo_speed(self):
         val = self.slider_demo_speed.get()
@@ -309,6 +393,8 @@ class MainView(ctk.CTkFrame):
         self.lbl_puzzle_info.configure(text=text)
 
     def load_puzzle_to_grid(self, grid_data):
+        self.clear_fast_solve_stats() # Ẩn thống kê cũ
+        
         for r in range(KICH_THUOC_LUOI):
             for c in range(KICH_THUOC_LUOI):
                 o_nhap_lieu = self.cac_o_nhap[(r, c)]
@@ -362,6 +448,8 @@ class MainView(ctk.CTkFrame):
                 o_nhap_lieu.configure(state='disabled')
 
     def clear_grid_and_stats(self):
+        self.clear_fast_solve_stats() # Ẩn thống kê
+        
         for r in range(KICH_THUOC_LUOI):
             for c in range(KICH_THUOC_LUOI):
                 o_nhap_lieu = self.cac_o_nhap[(r, c)]
@@ -405,6 +493,19 @@ class MainView(ctk.CTkFrame):
         else:
             messagebox.showinfo(title, message)
             
+    # --- HÀM MỚI ĐỂ KIỂM TRA TÍNH HỢP LỆ ---
+    def set_cell_validity(self, r, c, is_valid: bool):
+        """Đổi màu viền ô dựa trên tính hợp lệ."""
+        o_nhap_lieu = self.cac_o_nhap[(r, c)]
+        if not is_valid:
+            o_nhap_lieu.configure(border_color=MAU_O_LOI, border_width=3)
+        else:
+            # Chỉ reset nếu nó không phải ô gốc
+            if o_nhap_lieu.cget("state") == "normal":
+                o_nhap_lieu.configure(border_color=MAU_VIEN_LUOI[0], border_width=1)
+            
+    # --- CÁC HÀM STATE CỦA NÚT ĐÃ ĐƯỢC CẬP NHẬT ---
+            
     def set_buttons_state_on_load(self):
         self.btn_load_file.configure(state="normal")
         self.btn_csv_easy.configure(state="disabled")
@@ -412,7 +513,8 @@ class MainView(ctk.CTkFrame):
         self.btn_csv_hard.configure(state="disabled")
         self.btn_csv_extreme.configure(state="disabled")
         self.btn_giai.configure(state="disabled")
-        self.btn_sosanh.configure(state="disabled")
+        self.btn_sosanh.configure(state="disabled") # Tắt khi chưa load puzzle
+        self.btn_batch_analysis.configure(state="disabled") # Tắt khi chưa load CSV
         self.btn_xoa.configure(state="disabled")
 
     def set_buttons_state_csv_loaded(self):
@@ -422,7 +524,8 @@ class MainView(ctk.CTkFrame):
         self.btn_csv_hard.configure(state="normal")
         self.btn_csv_extreme.configure(state="normal")
         self.btn_giai.configure(state="disabled")
-        self.btn_sosanh.configure(state="disabled")
+        self.btn_sosanh.configure(state="disabled") # Tắt khi chưa load puzzle
+        self.btn_batch_analysis.configure(state="normal") # Bật khi đã load CSV
         self.btn_xoa.configure(state="disabled")
 
     def set_buttons_state_puzzle_on_grid(self, csv_loaded: bool):
@@ -432,32 +535,61 @@ class MainView(ctk.CTkFrame):
             self.btn_csv_medium.configure(state="normal")
             self.btn_csv_hard.configure(state="normal")
             self.btn_csv_extreme.configure(state="normal")
+            self.btn_batch_analysis.configure(state="normal") # Giữ bật
         else:
             self.btn_csv_easy.configure(state="disabled")
             self.btn_csv_medium.configure(state="disabled")
             self.btn_csv_hard.configure(state="disabled")
             self.btn_csv_extreme.configure(state="disabled")
+            self.btn_batch_analysis.configure(state="disabled") # Tắt nếu CSV không được load
         
         self.btn_giai.configure(state="normal")
-        self.btn_sosanh.configure(state="normal")
+        self.btn_sosanh.configure(state="normal") # Bật vì đã có puzzle
         self.btn_xoa.configure(state="normal")
 
     def set_buttons_state_visualizing(self, is_running: bool, csv_loaded: bool):
+        # Kiểm tra xem đây là Demo hay là Batch Analysis
+        is_demo_mode = self.switch_demo_mode.get()
+        
         if is_running:
             self.btn_load_file.configure(state="disabled")
             self.btn_csv_easy.configure(state="disabled")
             self.btn_csv_medium.configure(state="disabled")
             self.btn_csv_hard.configure(state="disabled")
             self.btn_csv_extreme.configure(state="disabled")
-            self.btn_giai.configure(text="❚❚ DỪNG DEMO", state="normal", fg_color="#E74C3C", hover_color="#EC7063")
             self.btn_sosanh.configure(state="disabled")
+            self.btn_batch_analysis.configure(state="disabled") # Tắt khi đang chạy
             self.btn_xoa.configure(state="disabled")
             self.switch_demo_mode.configure(state="disabled")
+            
+            # --- CẬP NHẬT LOGIC KHÓA LƯỚI ---
+            for r in range(9):
+                for c in range(9):
+                    self.cac_o_nhap[(r, c)].configure(state="disabled")
+            
+            if is_demo_mode:
+                self.btn_giai.configure(text="❚❚ DỪNG DEMO", state="normal", fg_color="#E74C3C", hover_color="#EC7063")
+            else:
+                # Đây là trường hợp chạy Giải nhanh hoặc Thực nghiệm
+                self.btn_giai.configure(state="disabled")
+
         else:
+            # Bật lại mọi thứ
             self.btn_load_file.configure(state="normal")
             self.switch_demo_mode.configure(state="normal")
-            self.set_buttons_state_puzzle_on_grid(csv_loaded)
-            self.toggle_demo_widgets()
+            
+            # --- CẬP NHẬT LOGIC MỞ LƯỚI ---
+            # Tải lại puzzle để tự động bật/tắt ô
+            if self.controller.current_puzzle_data:
+                self.load_puzzle_to_grid(self.controller.current_puzzle_data)
+            else:
+                # Trường hợp giải lưới trống
+                for r in range(9):
+                    for c in range(9):
+                        self.cac_o_nhap[(r, c)].configure(state="normal")
+
+            self.set_buttons_state_puzzle_on_grid(csv_loaded) # Logic này đã đúng
+            self.toggle_demo_widgets() # Đặt lại tên nút Giải
             self.btn_giai.configure(fg_color="#28a745", hover_color="#32CD32")
 
 
@@ -494,7 +626,11 @@ class MainView(ctk.CTkFrame):
         elif action == "restore_start":
             for (nr, nc) in data["neighbors"]:
                  if puzzle_data[nr][nc] == 0:
-                    self.cac_o_nhap[(nr, nc)].configure(border_color="gray", border_width=2)
+                    self.cac_o_nhap[(nr, nc)].configure(border_color=MAU_VIEN_KHOI_PHUC, border_width=2)
+     
+        # Cập nhật label khi kết thúc
+        if data.get("status") in ("solved", "failed") and 'stats' in data:
+             self.lbl_demo_stats.configure(text=f"Số bước lui: {data['stats']['backtracks']:,}")
      
     def reset_all_borders(self, puzzle_data: list):
         if not puzzle_data:

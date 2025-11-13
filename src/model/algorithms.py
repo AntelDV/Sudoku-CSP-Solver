@@ -1,4 +1,3 @@
-
 from .sudoku_board import SudokuBoard
 import copy 
 
@@ -172,33 +171,23 @@ def _prune_neighbors_domains(domains, r, c, num):
     """
     pruned_log = [] # Lưu lại những gì đã xóa
     
-    # 1. Cắt tỉa hàng
-    for col in range(9):
-        if col != c and num in domains[r][col]:
-            domains[r][col].remove(num)
-            pruned_log.append((r, col, num))
-            if not domains[r][col]: return (False, pruned_log) # Phát hiện ngõ cụt
-
-    # 2. Cắt tỉa cột
-    for row in range(9):
-        if row != r and num in domains[row][c]:
-            domains[row][c].remove(num)
-            pruned_log.append((row, c, num))
-            if not domains[row][c]: return (False, pruned_log)
-
-    # 3. Cắt tỉa khối 3x3
+    neighbors = set()
+    for col in range(9): neighbors.add((r, col))
+    for row in range(9): neighbors.add((row, c))
     box_r, box_c = (r // 3) * 3, (c // 3) * 3
     for br in range(box_r, box_r + 3):
         for bc in range(box_c, box_c + 3):
-            # Chỉ cắt tỉa nếu ô đó không phải là (r,c) VÀ
-            # nó không nằm trong hàng r hoặc cột c (vì đã cắt tỉa ở trên)
-            if (br, bc) != (r, c) and br != r and bc != c:
-                if num in domains[br][bc]:
-                    domains[br][bc].remove(num)
-                    pruned_log.append((br, bc, num))
-                    if not domains[br][bc]: return (False, pruned_log)
+            neighbors.add((br, bc))
+    neighbors.remove((r, c))
+
+    for (nr, nc) in neighbors:
+        if num in domains[nr][nc]:
+            domains[nr][nc].remove(num)
+            pruned_log.append((nr, nc, num))
+            if not domains[nr][nc]: 
+                return (False, pruned_log) 
                     
-    return (True, pruned_log) # Cắt tỉa thành công
+    return (True, pruned_log) 
 
 def _restore_neighbors_domains(domains, pruned_log):
     """
