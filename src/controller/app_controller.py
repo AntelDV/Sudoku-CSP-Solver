@@ -245,7 +245,7 @@ class AppController:
         return "".join(str(cell) for row in grid for cell in row)
 
     def run_fast_solve(self, grid_data, algo_key: str):
-        # SỬA LỖI: Chuyển 'algo_key' thành 'module_key' để gọi PROFILER
+        # SỬA LỖI 1: Chuyển 'algo_key' thành 'module_key' để gọi PROFILER
         if algo_key == 'bt':
             module_key = 'profiler_bt'
             algo_name = "Backtracking"
@@ -289,20 +289,14 @@ class AppController:
             self._log(f"[GIẢI] Giải thất bại ({algo_name})", "fail")
             
     
-    # --- HÀM SO SÁNH ĐƠN LẺ (CẬP NHẬT ĐỂ SO VỚI BASELINE) ---
+    # --- HÀM SO SÁNH ĐƠN LẺ (CẬP NHẬT) ---
     def handle_compare(self):
-        """So sánh (Baseline) với (Thuật toán được chọn)"""
+        """Chạy so sánh 2 thuật toán (BT và FC), và truyền data cho popup để tự chạy MRV."""
         if self.is_visualizer_running:
             if self.view: self.view.show_message("Lỗi", "Đang chạy Demo, không thể so sánh.", is_error=True)
             return
         if self.analysis_popup_window and self.analysis_popup_window.winfo_exists():
             self.analysis_popup_window.focus() 
-            return
-            
-        (algo_key_selected, _) = self.view.get_selected_algorithm()
-        
-        if algo_key_selected == 'bt':
-            self.view.show_message("Thông báo", "Không thể so sánh Backtracking (Baseline) với chính nó.", is_error=False)
             return
             
         grid_data_to_solve = None
@@ -320,37 +314,29 @@ class AppController:
             if self.view: self.view.show_message("Lỗi Đầu Vào", f"Lỗi: {e}", is_error=True)
             return
             
-        self._log("[PHÂN TÍCH] Đang phân tích hiệu năng (đơn lẻ)...", "cyan")
+        self._log("[PHÂN TÍCH] Đang phân tích hiệu năng (BT vs FC)...", "cyan")
         if self.view: self.view.root.update_idletasks()
         
         try:
-            # 1. Luôn chạy Baseline (Backtracking)
+            # 1. Chạy Baseline (Backtracking)
             bt_board, bt_stats, bt_solved = self._run_single_algo(
                 grid_data_to_solve, 'profiler_bt', 'bt'
             )
             
-            # 2. Chạy thuật toán được chọn
-            if algo_key_selected == 'fc':
-                module_key = 'profiler_fc'
-            elif algo_key_selected == 'fc_mrv':
-                module_key = 'profiler_mrv'
-            
-            adv_board, adv_stats, adv_solved = self._run_single_algo(
-                grid_data_to_solve, module_key, algo_key_selected
+            # 2. Chạy Cải tiến (Forward Checking)
+            fc_board, fc_stats, fc_solved = self._run_single_algo(
+                grid_data_to_solve, 'profiler_fc', 'fc'
             )
             
-            if bt_solved and adv_solved:
-                # Cập nhật tên thuật toán cho popup
-                if algo_key_selected == 'fc':
-                    adv_stats['name'] = "Forward Checking"
-                elif algo_key_selected == 'fc_mrv':
-                    adv_stats['name'] = "FC + MRV"
+            if bt_solved and fc_solved:
+                self._log("[PHÂN TÍCH] Hoàn tất (BT vs FC). Mở popup.", "green")
                 
+                # 3. Mở Popup và truyền (controller, stats_bt, stats_fc, grid_data)
                 self.analysis_popup_window = self.analysis_popup_class(
-                    self.view, bt_stats, adv_stats # Truyền (Baseline, Cải tiến)
+                    self.view, self, bt_stats, fc_stats, grid_data_to_solve
                 )
             else:
-                if self.view: self.view.show_message("Thất Bại", "Một trong hai thuật toán không tìm thấy lời giải.", is_error=True)
+                if self.view: self.view.show_message("Thất Bại", "Một trong hai thuật toán cơ bản không tìm thấy lời giải.", is_error=True)
                 self._log("[PHÂN TÍCH] Phân tích thất bại (không tìm thấy lời giải)", "fail")
         except Exception as e:
             if self.view: self.view.show_message("Lỗi Thực Thi", f"Lỗi nghiêm trọng: {traceback.format_exc()}", is_error=True)
@@ -497,31 +483,25 @@ class AppController:
     def _run_single_algo(self, grid_data, module_key: str, algo_key: str):
         SudokuBoard_class = self.model_classes['SudokuBoard']
         
-        # CẬP NHẬT: Thêm module_key cho MRV
+        # SỬA LỖI 1: Đơn giản hóa logic
+        
+        # 1. Xác định module
         if 'profiler' in module_key:
-            if module_key == 'profiler_bt':
-                module = self.model_classes['profiler_bt']
-            elif module_key == 'profiler_fc':
-                module = self.model_classes['profiler_fc']
-            elif module_key == 'profiler_mrv':
-                module = self.model_classes['profiler_mrv']
-            else:
-                raise ValueError(f"Module profiler không xác định: {module_key}")
-                
+            module = self.model_classes[module_key]
         elif 'visualizer' in module_key:
             module = self.model_classes[module_key]
         else:
-            module = self.model_classes['algorithms'] # Chỉ dùng cho Giải nhanh BT/FC cũ (ĐÃ SỬA)
+            # Trường hợp 'algorithms' (không còn được 'run_fast_solve' dùng nữa)
+            module = self.model_classes['algorithms']
 
+        # 2. Xác định hàm
         solve_func = None
-        
-        # CẬP NHẬT: Thêm logic gọi hàm cho MRV
         if algo_key == 'bt':
             if 'profiler' in module_key:
                 solve_func = module.solve_backtracking_profile
             elif 'visualizer' in module_key:
                 solve_func = module.solve_backtracking_visual
-            else: # algorithms
+            else: 
                 solve_func = module.solve_backtracking
         
         elif algo_key == 'fc':
@@ -529,17 +509,18 @@ class AppController:
                 solve_func = module.solve_forward_checking_profile
             elif 'visualizer' in module_key:
                 solve_func = module.solve_forward_checking_visual
-            else: # algorithms
+            else: 
                 solve_func = module.solve_forward_checking
                 
         elif algo_key == 'fc_mrv':
             if 'profiler' in module_key:
                 solve_func = module.solve_forward_checking_mrv_profile
             elif 'visualizer' in module_key:
-                # Tạm thời chưa có visualizer cho MRV
+                # Tạm thời chưa có visualizer cho MRV, dùng FC thay thế
                 solve_func = self.model_classes['visualizer_fc'].solve_forward_checking_visual
-            else: # algorithms
-                solve_func = self.model_classes['algorithms_mrv'].solve_forward_checking_mrv
+            else: 
+                # Trường hợp này không bao giờ được gọi, nhưng để an toàn
+                solve_func = self.model_classes['profiler_mrv'].solve_forward_checking_mrv_profile
         
         
         board_wrapper = SudokuBoard_class(copy.deepcopy(grid_data))
