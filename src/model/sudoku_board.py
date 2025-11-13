@@ -1,16 +1,7 @@
-# Mô tả: Lớp này đóng vai trò là "Model" trong MVC.
-#        Nó hiện thực hóa bài toán Sudoku theo lý thuyết CSP:
-#        - Biến (Variables): 81 ô (self.board)
-#        - Miền giá trị (Domain): {1-9}
-#        - Ràng buộc (Constraints): Các hàm is_valid_...
-
-import time  # Dùng để đo thời gian thực thi
+import time 
 
 class SudokuBoard:
-    """
-    Quản lý trạng thái và các ràng buộc của bàn cờ Sudoku 9x9.
-    Đây là "API nội bộ" mà các thuật toán giải (Algorithms) sẽ sử dụng.
-    """
+
     def __init__(self, initial_board):
         """
         Khởi tạo bàn cờ.
@@ -22,29 +13,34 @@ class SudokuBoard:
         self.execution_time = 0
 
     def get_board(self):
-        """Trả về trạng thái hiện tại của bàn cờ."""
+        """Trả về trạng thái hiện tại của bàn cờ (ma trận 9x9)."""
         return self.board
 
     def set_cell(self, row, col, value):
-        """Đặt giá trị cho một ô cụ thể."""
+        """Đặt giá trị cho một ô cụ thể trên bàn cờ."""
         self.board[row][col] = value
 
     def find_empty_cell(self):
         """
-        Tìm ô trống (giá trị 0) tiếp theo để điền.
+        Tìm ô trống (giá trị 0) tiếp theo (quét từ trái sang phải, trên xuống dưới).
+        
         :return: (tuple) (hàng, cột) hoặc None nếu không còn ô trống.
         """
         for r in range(9):
             for c in range(9):
                 if self.board[r][c] == 0:
                     return (r, c)
-        return None  # Không còn ô trống, bàn cờ đã giải xong
+        return None  # Không còn ô trống -> Đã giải xong
 
     def is_valid(self, num, row, col):
         """
         Kiểm tra xem việc gán 'num' vào (row, col) có vi phạm
-        bất kỳ ràng buộc nào (hàng, cột, khối 3x3) hay không.
-        Đây là hàm kiểm tra Constraints cốt lõi.
+        bất kỳ ràng buộc CSP nào (hàng, cột, khối 3x3) hay không.
+        
+        :param num: Số (1-9) cần kiểm tra.
+        :param row: Vị trí hàng (0-8).
+        :param col: Vị trí cột (0-8).
+        :return: (bool) True nếu hợp lệ, False nếu vi phạm.
         """
         # 1. Ràng buộc Hàng (Row Constraint)
         for c in range(9):
@@ -57,7 +53,6 @@ class SudokuBoard:
                 return False
 
         # 3. Ràng buộc Khối 3x3 (Box Constraint)
-        # Tìm tọa độ bắt đầu của khối 3x3
         box_start_row = (row // 3) * 3
         box_start_col = (col // 3) * 3
 
@@ -70,7 +65,7 @@ class SudokuBoard:
         return True
 
     def start_timer(self):
-        """Bắt đầu đếm thời gian giải."""
+        """Bắt đầu đếm thời gian."""
         self.start_time = time.perf_counter()
         self.execution_time = 0
 
@@ -81,8 +76,8 @@ class SudokuBoard:
 
     def get_stats(self):
         """
-        Trả về các thông số cơ bản.
-        Sẽ được mở rộng bởi các thuật toán (ví dụ: đếm số bước quay lui).
+        Trả về các thông số cơ bản (thời gian thực thi).
+        Các hàm profiler sẽ cập nhật thêm vào dictionary này.
         """
         return {
             "execution_time_sec": self.execution_time

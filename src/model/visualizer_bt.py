@@ -2,8 +2,11 @@ from .sudoku_board import SudokuBoard
 
 def solve_backtracking_visual(board_wrapper: SudokuBoard, stats: dict):
     """
-    Hàm Generator chính cho Backtracking.
-    Nó "yield" (trả về) trạng thái sau mỗi hành động.
+    Tạo hàm Generator (trực quan hóa) cho thuật toán Backtracking.
+    
+    Thay vì trả về (bool), hàm này "yield" (trả về) một
+    dictionary trạng thái sau mỗi hành động (thử, quay lui)
+    để View có thể cập nhật giao diện.
     
     :param board_wrapper: Đối tượng SudokuBoard.
     :param stats: Dictionary để đếm (chỉ đếm backtracks).
@@ -30,7 +33,6 @@ def solve_backtracking_visual(board_wrapper: SudokuBoard, stats: dict):
             board_wrapper.set_cell(row, col, num)
             
             # --- YIELD 1: Báo cáo "ĐANG THỬ" ---
-            # Tạm dừng và báo cho GUI tô màu ô này
             yield {
                 "action": "try",
                 "cell": (row, col),
@@ -39,20 +41,16 @@ def solve_backtracking_visual(board_wrapper: SudokuBoard, stats: dict):
             }
 
             # 3.2. "Gọi đệ quy" (bằng yield from)
-            # Tiếp tục chạy hàm này cho ô tiếp theo
             result = yield from solve_backtracking_visual(board_wrapper, stats)
             
             if result:
-                return True # Nếu nhánh con thành công -> trả về True
+                return True # Nhánh con thành công -> lan truyền True lên
 
             # 3.3. Nếu đệ quy (result) trả về False -> NGÕ CỤT
             stats["backtracks"] += 1
-            
-            # Đặt lại giá trị ô về 0
-            board_wrapper.set_cell(row, col, 0)
+            board_wrapper.set_cell(row, col, 0) # Đặt lại giá trị ô
 
             # --- YIELD 2: Báo cáo "QUAY LUI" ---
-            # Tạm dừng và báo cho GUI tô màu đỏ ô này
             yield {
                 "action": "backtrack",
                 "cell": (row, col),
@@ -62,3 +60,4 @@ def solve_backtracking_visual(board_wrapper: SudokuBoard, stats: dict):
 
     # 4. Nếu thử hết 9 số mà không số nào hợp lệ
     return False # Kích hoạt quay lui ở cấp cao hơn
+}

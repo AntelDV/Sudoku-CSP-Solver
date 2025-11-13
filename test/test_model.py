@@ -1,13 +1,3 @@
-# File: test/test_model.py
-# Người thực hiện: Vai trò 1 (Kiến trúc sư)
-# Mô tả: File này dùng để kiểm thử độc lập phần Model (SudokuBoard
-#        và các thuật toán) mà không cần GUI.
-# Cách chạy:
-# 1. Mở terminal trong thư mục gốc Sudoku_CSP_Solver
-# 2. (Kích hoạt venv nếu bạn đang dùng)
-# 3. Chạy lệnh: python -m test.test_model
-
-# Thêm đường dẫn thư mục gốc vào Python Path để import 'src'
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -17,7 +7,6 @@ from src.model.sudoku_board import SudokuBoard
 from src.model.algorithms import solve_backtracking, solve_forward_checking
 
 # --- Đề bài dùng chung cho cả 2 bài test ---
-# (Đề bài gốc của bạn)
 puzzle_matrix = [
     [5, 3, 0, 0, 7, 0, 0, 0, 0],
     [6, 0, 0, 1, 9, 5, 0, 0, 0],
@@ -109,8 +98,7 @@ def run_test_forward_checking():
         print(f"  Số bước quay lui:   {final_stats['backtracks']}")
     else:
         print("\n--- KHÔNG TÌM THẤY LỜI GẢI ---")
-
-# Chạy test khi file này được thực thi trực tiếp
+        
 if __name__ == "__main__":
     print("=====================================================")
     print("  BẮT ĐẦU KIỂM THỬ SO SÁNH CÁC THUẬT TOÁN MODEL")
