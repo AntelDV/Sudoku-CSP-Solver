@@ -47,7 +47,9 @@ class MainView(ctk.CTkFrame):
         self.combo_fast_solve = None 
         self.btn_check = None 
         self.frame_numpad = None 
-        
+        self.sep_1 = None
+        self.sep_2 = None
+
         # Buttons
         self.btn_load_file = None
         self.btn_csv_easy = None
@@ -73,13 +75,14 @@ class MainView(ctk.CTkFrame):
         return gia_tri_moi.isdigit()
 
     def khoi_tao_giao_dien(self):
-        self.grid_columnconfigure(0, weight=1, minsize=600)
-        self.grid_columnconfigure(1, minsize=380)
+        # Mở rộng cột 0 để chứa lưới lớn
+        self.grid_columnconfigure(0, weight=1, minsize=800) 
+        self.grid_columnconfigure(1, minsize=350)
         self.grid_rowconfigure(0, weight=1)
         
         # Khung Lưới (Bên trái)
         self.khung_luoi_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.khung_luoi_container.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
+        self.khung_luoi_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
         # Vẽ lưới mặc định 9x9
         self.rebuild_grid(9)
@@ -89,7 +92,7 @@ class MainView(ctk.CTkFrame):
         khung_dieu_khien.grid(row=0, column=1, sticky="nsew")
 
         khung_controls_inner = ctk.CTkFrame(khung_dieu_khien, fg_color="transparent", corner_radius=0)
-        khung_controls_inner.pack(fill="both", expand=True, padx=20, pady=20)
+        khung_controls_inner.pack(fill="both", expand=True, padx=15, pady=15)
         
         self.tao_khung_dieu_khien(khung_controls_inner)
 
@@ -101,25 +104,38 @@ class MainView(ctk.CTkFrame):
         for widget in self.khung_luoi_container.winfo_children():
             widget.destroy()
             
-        # Tính toán kích thước ô động
-        max_width = 600
-        max_height = 600
+        # Tăng kích thước tối đa của khung lưới để tận dụng màn hình lớn
+        max_width = 800 
+        max_height = 800
+        
+        # Tính toán kích thước mỗi ô
         cell_size = min(max_width // n, max_height // n)
-        if cell_size < 25: cell_size = 25 # Giới hạn nhỏ nhất
+        if cell_size < 22: cell_size = 22 
         
-        font_size = int(cell_size * 0.5)
+        # Tính toán font chữ: Với N lớn, font phải nhỏ lại và đậm hơn
+        if n >= 25:
+            font_size = int(cell_size * 0.45) 
+        elif n >= 16:
+            font_size = int(cell_size * 0.5)
+        else:
+            font_size = int(cell_size * 0.6)
+            
         box_size = int(n ** 0.5)
-        
         self.cac_o_nhap = {}
         
         khung_center = ctk.CTkFrame(self.khung_luoi_container, fg_color="transparent")
         khung_center.pack(expand=True)
         
+        # Padding giữa các Block
+        # Nếu lưới quá dày (25x25)
+        block_pad = 1 if n > 16 else 2
+        cell_pad = 0 if n >= 16 else 1 
+        
         # Vẽ từng Block (Box)
         for box_r in range(box_size):
             for box_c in range(box_size):
                 frame_box = ctk.CTkFrame(khung_center, fg_color="black", corner_radius=0, border_width=0)
-                frame_box.grid(row=box_r, column=box_c, padx=1, pady=1)
+                frame_box.grid(row=box_r, column=box_c, padx=block_pad, pady=block_pad)
                 
                 # Vẽ từng Cell trong Block
                 for cell_r in range(box_size):
@@ -130,11 +146,11 @@ class MainView(ctk.CTkFrame):
                         entry = ctk.CTkEntry(
                             frame_box, width=cell_size, height=cell_size,
                             font=ctk.CTkFont(size=font_size, weight="bold"),
-                            justify="center", corner_radius=0, border_width=1,
+                            justify="center", corner_radius=0, border_width=0 if n>=25 else 1,
                             fg_color="white", text_color="black",
                             validate="key", validatecommand=self.vcmd
                         )
-                        entry.grid(row=cell_r, column=cell_c, padx=0, pady=0)
+                        entry.grid(row=cell_r, column=cell_c, padx=cell_pad, pady=cell_pad)
                         
                         self.cac_o_nhap[(global_r, global_c)] = entry
                         
@@ -151,7 +167,7 @@ class MainView(ctk.CTkFrame):
             font=ctk.CTkFont(size=36, weight="bold"), text_color="#38bdf8"
         ).pack(expand=True)
         
-        # 2. Chọn Size (Mới)
+        # 2. Chọn Size
         khung_size = ctk.CTkFrame(parent, fg_color="transparent")
         khung_size.pack(fill="x", pady=2)
         ctk.CTkLabel(khung_size, text="Kích thước:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=5)
@@ -165,7 +181,8 @@ class MainView(ctk.CTkFrame):
         # 3. Nạp đề
         self.tao_khung_nap_de(parent)
         
-        ctk.CTkFrame(parent, height=2, fg_color="#334155").pack(fill="x", padx=0, pady=5)
+        self.sep_1 = ctk.CTkFrame(parent, height=2, fg_color="#334155")
+        self.sep_1.pack(fill="x", padx=0, pady=5)
 
         # 4. Chọn chế độ
         self.tao_khung_che_do(parent) 
@@ -173,7 +190,8 @@ class MainView(ctk.CTkFrame):
         # 5. Hành động (Giải/Check)
         self.tao_khung_hanh_dong(parent)
         
-        ctk.CTkFrame(parent, height=2, fg_color="#334155").pack(fill="x", padx=0, pady=5)
+        self.sep_2 = ctk.CTkFrame(parent, height=2, fg_color="#334155")
+        self.sep_2.pack(fill="x", padx=0, pady=5)
 
         # 6. Demo Tools (Máy giải) hoặc Numpad (Người chơi)
         self.tao_khung_che_do_demo(parent)
@@ -195,7 +213,6 @@ class MainView(ctk.CTkFrame):
         grid_frame = ctk.CTkFrame(self.frame_numpad, fg_color="transparent")
         grid_frame.pack()
         
-        # Tạo bàn phím 1-9
         btn_nums = [
             (1, 0, 0), (2, 0, 1), (3, 0, 2),
             (4, 1, 0), (5, 1, 1), (6, 1, 2),
@@ -210,7 +227,6 @@ class MainView(ctk.CTkFrame):
             )
             btn.grid(row=r, column=c, padx=3, pady=3)
         
-        # Nút Xóa
         btn_clear = ctk.CTkButton(
             grid_frame, text="⌫", width=50, height=40,
             font=ctk.CTkFont(size=16, weight="bold"),
@@ -267,16 +283,12 @@ class MainView(ctk.CTkFrame):
             # Hiện thành phần Người chơi
             self.btn_check.pack(pady=5)
             self.btn_xoa.configure(text="✕ LÀM LẠI")
-            
-            # Nút check luôn sáng
             self.btn_check.configure(state="normal")
             
-            # Hiện Numpad
             self.frame_numpad.pack(fill="x", pady=5)
         else:
             # Hiện lại thành phần Máy giải
             self.switch_demo_mode.pack(pady=5, padx=10, anchor="w")
-            # Chỉ hiện slider nếu switch đang bật
             if self.switch_demo_mode.get():
                 self.slider_demo_speed.pack(pady=(5, 5))
                 self.lbl_demo_stats.pack(pady=5)
@@ -285,7 +297,6 @@ class MainView(ctk.CTkFrame):
             self.btn_sosanh.grid()
             self.combo_fast_solve.pack(pady=(5, 5))
             
-            # Ẩn thành phần Người chơi
             self.btn_check.pack_forget()
             self.btn_xoa.configure(text="✕ XÓA")
             self.frame_numpad.pack_forget()
@@ -504,8 +515,7 @@ class MainView(ctk.CTkFrame):
 
     def set_buttons_state_puzzle_on_grid(self, csv_loaded: bool):
         self.btn_load_file.configure(state="normal")
-        
-        # Luôn enable lấy đề (vì giờ có Generator)
+        state_csv = "normal" if csv_loaded else "disabled"
         self.btn_csv_easy.configure(state="normal")
         self.btn_csv_medium.configure(state="normal")
         self.btn_csv_hard.configure(state="normal")

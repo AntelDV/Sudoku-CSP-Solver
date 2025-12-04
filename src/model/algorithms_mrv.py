@@ -1,80 +1,74 @@
 from .sudoku_board import SudokuBoard
-import copy 
-
-# --- Thuật toán Backtracking  ---
-def solve_backtracking(board_wrapper: SudokuBoard, stats: dict):
-    """
-    Giải Sudoku bằng thuật toán Backtracking cơ bản (Baseline).
-    
-    :param board_wrapper: Đối tượng SudokuBoard chứa bàn cờ.
-    :param stats: Dictionary để theo dõi số liệu.
-    :return: (bool) True nếu tìm thấy lời giải.
-    """
-    empty_cell = board_wrapper.find_empty_cell()
-    if not empty_cell:
-        return True  
-    row, col = empty_cell
-    for num in range(1, 10):
-        if board_wrapper.is_valid(num, row, col):
-            board_wrapper.set_cell(row, col, num)
-            if solve_backtracking(board_wrapper, stats):
-                return True  
-            stats["backtracks"] += 1
-            board_wrapper.set_cell(row, col, 0)
-    return False
-
-# --- BẮT ĐẦU LOGIC FORWARD CHECKING + MRV ---
 
 def solve_forward_checking_mrv(board_wrapper: SudokuBoard, stats: dict):
     """
-    Hàm "public" để khởi chạy thuật toán Forward Checking + MRV.
-    Hàm này khởi tạo miền giá trị (domains) và gọi hàm đệ quy.
+    Hàm khởi chạy thuật toán Forward Checking kết hợp MRV (Minimum Remaining Values).
     
-    :param board_wrapper: Đối tượng SudokuBoard chứa bàn cờ.
-    :param stats: Dictionary để theo dõi số liệu (chỉ đếm backtracks).
-    :return: (bool) True nếu tìm thấy lời giải.
+    Quy trình tổng quát:
+    1. Khởi tạo miền giá trị (Domain) cho tất cả các ô trống.
+    2. Thực hiện cắt tỉa ban đầu dựa trên các số đề bài đã cho.
+    3. Gọi hàm đệ quy để giải quyết bài toán.
     """
     try:
-        # 1. Khởi tạo và cắt tỉa (pre-prune) miền giá trị
-        domains = _initialize_domains(board_wrapper.get_board())
+        # Khởi tạo và cắt tỉa domain ban đầu
+        domains = _initialize_domains(board_wrapper)
     except ValueError:
-        return False # Đề bài gốc không hợp lệ
+        # Nếu đề bài ban đầu đã vi phạm luật chơi -> Trả về False
+        return False
         
-    # 2. Gọi hàm đệ quy chính
+    # Bắt đầu quá trình giải đệ quy
     return _solve_fc_recursive_mrv(board_wrapper, stats, domains)
 
-def _initialize_domains(board):
+def _initialize_domains(board_wrapper):
     """
-    Tạo và tiền xử lý (pre-prune) các miền giá trị dựa trên đề bài.
-    (Giống hệt file algorithms.py)
-    full_domain = {1, 2, 3, 4, 5, 6, 7, 8, 9}
+    Khởi tạo miền giá trị {1..N} cho mọi ô và loại bỏ các giá trị không hợp lệ
+    dựa trên các số đã có sẵn trên bàn cờ.
     """
-    domains = [[full_domain.copy() for _ in range(9)] for _ in range(9)]
-    for r in range(9):
-        for c in range(9):
+    n = board_wrapper.n
+    board = board_wrapper.get_board()
+    
+    # Tạo domain đầy đủ ban đầu cho tất cả các ô
+    full_domain = set(range(1, n + 1))
+    domains = [[full_domain.copy() for _ in range(n)] for _ in range(n)]
+    
+    # Duyệt qua các ô đã có số (đề bài)
+    for r in range(n):
+        for c in range(n):
             num = board[r][c]
             if num != 0:
+                # Nếu ô đã có số, domain của nó chỉ còn chính số đó
                 domains[r][c] = {num}
-                if not _prune_domains_on_setup(domains, r, c, num):
+                
+                # Cắt tỉa số này khỏi domain của các ô hàng xóm (Hàng, Cột, Khối)
+                if not _prune_domains_on_setup(domains, r, c, num, board_wrapper):
                     raise ValueError("Invalid initial puzzle")
     return domains
 
-def _prune_domains_on_setup(domains, r, c, num):
+def _prune_domains_on_setup(domains, r, c, num, board_wrapper):
     """
-    Hàm cắt tỉa ban đầu dựa trên các số cho sẵn.
-    (Giống hệt file algorithms.py)
+    Hàm cắt tỉa dùng riêng cho bước khởi tạo.
+    Nhiệm vụ: Loại bỏ số 'num' khỏi miền giá trị của tất cả các ô liên quan (Hàng, Cột, Khối).
     """
-    for col in range(9):
+    n = board_wrapper.n
+    box_size = board_wrapper.box_size
+    
+    # 1. Cắt tỉa trên Hàng
+    for col in range(n):
         if col != c and num in domains[r][col]:
             domains[r][col].remove(num)
-            if not domains[r][col]: return False 
-    for row in range(9):
+            if not domains[r][col]: return False # Mâu thuẫn: Ô hàng xóm hết giá trị để điền
+
+    # 2. Cắt tỉa trên Cột
+    for row in range(n):
         if row != r and num in domains[row][c]:
             domains[row][c].remove(num)
             if not domains[row][c]: return False
-    box_r, box_c = (r // 3) * 3, (c // 3) * 3
-    for br in range(box_r, box_r + 3):
-        for bc in range(box_c, box_c + 3):
+            
+    # 3. Cắt tỉa trong Khối (Box)
+    box_r = (r // box_size) * box_size
+    box_c = (c // box_size) * box_size
+    for br in range(box_r, box_r + box_size):
+        for bc in range(box_c, box_c + box_size):
             if (br, bc) != (r, c) and num in domains[br][bc]:
                 domains[br][bc].remove(num)
                 if not domains[br][bc]: return False
@@ -82,105 +76,119 @@ def _prune_domains_on_setup(domains, r, c, num):
 
 def _find_cell_with_mrv(board_wrapper: SudokuBoard, domains: list):
     """
-    Tìm ô trống (giá trị 0) có miền giá trị (domain) nhỏ nhất.
-    Đây là cốt lõi của heuristic MRV.
+    Chiến lược chọn biến MRV (Minimum Remaining Values).
     
-    :param board_wrapper: Đối tượng SudokuBoard.
-    :param domains: Cấu trúc miền giá trị.
-    :return: (tuple) (r, c) của ô tốt nhất, hoặc None nếu không tìm thấy.
+    Thay vì chọn ô trống đầu tiên tìm thấy, hàm này sẽ:
+    1. Quét toàn bộ bàn cờ.
+    2. Tìm ô trống có miền giá trị (domain) NHỎ NHẤT (ít lựa chọn nhất).
+    3. Ưu tiên giải ô này trước ("Fail-First" principle).
     """
-    min_len = 10 # Bắt đầu với số lớn hơn 9
+    min_len = board_wrapper.n + 1 
     best_cell = None
     board = board_wrapper.get_board()
+    n = board_wrapper.n
     
-    for r in range(9):
-        for c in range(9):
-            if board[r][c] == 0: # Nếu là ô trống
+    for r in range(n):
+        for c in range(n):
+            if board[r][c] == 0: # Chỉ xét ô chưa điền
                 current_len = len(domains[r][c])
                 
-                if current_len == 0: 
-                    # Tối ưu: Phát hiện ngõ cụt ngay lập tức
-                    return None 
+                # Nếu gặp ô có domain rỗng -> Ngõ cụt chắc chắn -> Báo ngay
+                if current_len == 0: return None 
                 
+                # Cập nhật ô tốt nhất nếu tìm thấy ô có domain nhỏ hơn
                 if current_len < min_len:
                     min_len = current_len
                     best_cell = (r, c)
                     
-                    if min_len == 1: 
-                        # Tối ưu: Không thể nhỏ hơn 1
-                        return best_cell
-                        
-    return best_cell # Trả về ô có domain nhỏ nhất
+                    # Tối ưu: Nếu domain chỉ còn 1 giá trị -> Chọn luôn vì không thể tốt hơn
+                    if min_len == 1: return best_cell
+    return best_cell
 
 def _solve_fc_recursive_mrv(board_wrapper: SudokuBoard, stats: dict, domains: list):
     """
-    Hàm đệ quy chính cho Forward Checking, sử dụng MRV để chọn ô.
+    Hàm đệ quy chính thực hiện FC + MRV.
     
-    :param board_wrapper: Đối tượng SudokuBoard.
-    :param stats: Dictionary thống kê (chỉ đếm backtracks).
-    :param domains: Cấu trúc miền giá trị.
-    :return: (bool) True nếu tìm thấy lời giải.
+    Quy trình hoạt động:
+    1. Chọn ô trống tối ưu nhất bằng MRV.
+    2. Nếu không còn ô trống -> Giải xong (Thành công).
+    3. Lặp qua các giá trị trong domain của ô đó.
+    4. Thử điền -> Cắt tỉa domain hàng xóm -> Gọi đệ quy.
+    5. Nếu thất bại -> Khôi phục domain (Undo) -> Quay lui.
     """
-    
-    # 1. TÌM Ô TRỐNG BẰNG MRV (thay vì find_empty_cell)
+    # Bước 1: Chọn ô cần điền bằng MRV
     empty_cell = _find_cell_with_mrv(board_wrapper, domains)
     
     if not empty_cell:
-        # Nếu _find_cell_with_mrv trả về None VÀ bảng chưa đầy
-        # -> nghĩa là có ô trống nhưng domain rỗng -> NGÕ CỤT
-        # Nếu bảng đã đầy -> GIẢI XONG
-        if board_wrapper.find_empty_cell() is None:
-             return True # Đã giải xong
-        else:
-             return False # Ngõ cụt do MRV phát hiện
+        # Nếu hàm tìm kiếm trả về None:
+        # - Hoặc là bàn cờ đã đầy (Thành công).
+        # - Hoặc là bàn cờ còn trống nhưng có ô bị rỗng domain (Thất bại).
+        if board_wrapper.find_empty_cell() is None: return True 
+        else: return False 
         
     row, col = empty_cell
-
-    # 2. Lặp qua MIỀN GIÁ TRỊ (đã được cắt tỉa)
-    domain_to_try = list(domains[row][col]) 
+    
+    # Bước 2: Lấy danh sách các giá trị khả dĩ để thử
+    domain_to_try = list(domains[row][col])
     
     for num in domain_to_try:
-        # 3. Gán giá trị
+        # Bước 3: Gán giá trị thử
         board_wrapper.set_cell(row, col, num)
         
-        # 4. Cắt tỉa hàng xóm (Forward Checking)
-        is_consistent, pruned_log = _prune_neighbors_domains(domains, row, col, num)
+        # Bước 4: Lan truyền ràng buộc (Cắt tỉa domain hàng xóm)
+        is_consistent, pruned_log = _prune_neighbors_domains(domains, row, col, num, board_wrapper)
         
-        # 5. Kiểm tra kết quả cắt tỉa
+        # Bước 5: Nếu cắt tỉa thành công (không gây mâu thuẫn), tiếp tục đệ quy
         if is_consistent:
             if _solve_fc_recursive_mrv(board_wrapper, stats, domains):
                 return True 
 
-        # 6. (BACKTRACK)
-        stats["backtracks"] += 1
+        # Bước 6: Nếu đi vào ngõ cụt -> Quay lui (Backtrack)
+        stats["backtracks"] = stats.get("backtracks", 0) + 1
+        
+        # Khôi phục lại các giá trị đã bị cắt tỉa
         _restore_neighbors_domains(domains, pruned_log)
+        
+        # Xóa số vừa điền khỏi bàn cờ
         board_wrapper.set_cell(row, col, 0)
     
-    # 7. Nếu lặp hết domain của ô này
+    # Đã thử hết các giá trị trong domain mà không thành công
     return False
 
-def _prune_neighbors_domains(domains, r, c, num):
-    """Cắt tỉa 'num' khỏi miền giá trị của các hàng xóm."""
+def _prune_neighbors_domains(domains, r, c, num, board_wrapper):
+    """
+    Thực hiện Forward Checking: Loại bỏ 'num' khỏi domain của hàng xóm.
+    Trả về danh sách (log) các giá trị đã xóa để phục vụ việc khôi phục.
+    """
     pruned_log = [] 
+    n = board_wrapper.n
+    box_size = board_wrapper.box_size
     neighbors = set()
-    for col in range(9): neighbors.add((r, col))
-    for row in range(9): neighbors.add((row, c))
-    box_r, box_c = (r // 3) * 3, (c // 3) * 3
-    for br in range(box_r, box_r + 3):
-        for bc in range(box_c, box_c + 3):
+    
+    # Xác định các ô hàng xóm (Hàng, Cột, Khối)
+    for col in range(n): neighbors.add((r, col))
+    for row in range(n): neighbors.add((row, c))
+    box_r = (r // box_size) * box_size
+    box_c = (c // box_size) * box_size
+    for br in range(box_r, box_r + box_size):
+        for bc in range(box_c, box_c + box_size):
             neighbors.add((br, bc))
-    neighbors.remove((r, c))
+    neighbors.discard((r, c)) # Loại bỏ chính ô đang xét
 
+    # Duyệt và cắt tỉa
     for (nr, nc) in neighbors:
         if num in domains[nr][nc]:
             domains[nr][nc].remove(num)
-            pruned_log.append((nr, nc, num))
+            pruned_log.append((nr, nc, num)) # Ghi nhật ký
+            
+            # Nếu domain hàng xóm trở nên rỗng -> Phát hiện mâu thuẫn ngay lập tức
             if not domains[nr][nc]: 
                 return (False, pruned_log) 
-                    
     return (True, pruned_log) 
 
 def _restore_neighbors_domains(domains, pruned_log):
-    """Khôi phục lại các miền giá trị từ log."""
+    """
+    Hoàn tác quá trình cắt tỉa: Trả lại các giá trị đã xóa vào domain tương ứng.
+    """
     for (r, c, num) in pruned_log:
         domains[r][c].add(num)
