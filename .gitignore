@@ -10,5 +10,5 @@ __pycache__/
 
 *.csv
 data/sudoku.csv
-data/sudoku1.csv
+
 
