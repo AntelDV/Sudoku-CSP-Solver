@@ -17,6 +17,7 @@ from src.model.sudoku_board import SudokuBoard
 from src.model import algorithms
 from src.model import visualizer_bt
 from src.model import visualizer_fc
+from src.model import visualizer_mrv  # <--- THÊM MỚI Ở ĐÂY
 from src.model import profiler_bt
 from src.model import profiler_fc
 from src.model import profiler_mrv 
@@ -32,6 +33,7 @@ def main():
         'algorithms': algorithms,
         'visualizer_bt': visualizer_bt,
         'visualizer_fc': visualizer_fc,
+        'visualizer_mrv': visualizer_mrv, # <--- THÊM MỚI VÀO DICTIONARY
         'profiler_bt': profiler_bt,
         'profiler_fc': profiler_fc,
         'profiler_mrv': profiler_mrv,
