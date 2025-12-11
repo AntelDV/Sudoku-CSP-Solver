@@ -20,6 +20,7 @@ from src.model import visualizer_mrv
 from src.model import profiler_bt
 from src.model import profiler_fc
 from src.model import profiler_mrv 
+from src.model import solver_dlx 
 
 def main():
 
@@ -37,6 +38,7 @@ def main():
         'profiler_bt': profiler_bt,
         'profiler_fc': profiler_fc,
         'profiler_mrv': profiler_mrv,
+        'solver_dlx': solver_dlx,
     }
     
     root = ctk.CTk()

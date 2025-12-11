@@ -10,7 +10,6 @@ def solve_forward_checking_mrv_visual(board_wrapper: SudokuBoard, stats: dict):
     yield from _solve_fc_recursive_mrv_visual(board_wrapper, stats, domains)
 
 def _initialize_domains(board_wrapper):
-    # Quy trình khởi tạo giống FC visual
     n = board_wrapper.n
     board = board_wrapper.get_board()
     full_domain = set(range(1, n + 1))
@@ -26,7 +25,6 @@ def _initialize_domains(board_wrapper):
     return domains
 
 def _prune_domains_on_setup(domains, r, c, num, board_wrapper):
-    # Quy trình cắt tỉa ban đầu giống FC visual
     n = board_wrapper.n
     box_size = board_wrapper.box_size
     neighbors = set()
@@ -47,9 +45,6 @@ def _prune_domains_on_setup(domains, r, c, num, board_wrapper):
     return True
 
 def _find_cell_with_mrv(board_wrapper: SudokuBoard, domains: list):
-    """
-    Tìm ô trống có domain nhỏ nhất (MRV) để ưu tiên xử lý.
-    """
     min_len = board_wrapper.n + 1 
     best_cell = None
     board = board_wrapper.get_board()
@@ -68,7 +63,7 @@ def _find_cell_with_mrv(board_wrapper: SudokuBoard, domains: list):
     return best_cell
 
 def _solve_fc_recursive_mrv_visual(board_wrapper: SudokuBoard, stats: dict, domains: list):
-    # Bước 1: Chọn ô bằng MRV
+    # Chọn ô bằng MRV
     empty_cell = _find_cell_with_mrv(board_wrapper, domains)
 
     if not empty_cell:
@@ -92,8 +87,8 @@ def _solve_fc_recursive_mrv_visual(board_wrapper: SudokuBoard, stats: dict, doma
             "status": "running"
         }
 
-        # Báo hiệu cắt tỉa
-        is_consistent, pruned_log = yield from _prune_neighbors_visual(domains, row, col, num, board_wrapper)
+        # Báo hiệu cắt tỉa (Lấy neighbors_list)
+        is_consistent, pruned_log, neighbors_list = yield from _prune_neighbors_visual(domains, row, col, num, board_wrapper)
         
         if is_consistent:
             result = yield from _solve_fc_recursive_mrv_visual(board_wrapper, stats, domains)
@@ -102,7 +97,7 @@ def _solve_fc_recursive_mrv_visual(board_wrapper: SudokuBoard, stats: dict, doma
 
         # Quay lui
         stats["backtracks"] = stats.get("backtracks", 0) + 1
-        yield from _restore_neighbors_visual(domains, pruned_log)
+        yield from _restore_neighbors_visual(domains, pruned_log, neighbors_list)
         board_wrapper.set_cell(row, col, 0)
         
         yield {
@@ -115,7 +110,6 @@ def _solve_fc_recursive_mrv_visual(board_wrapper: SudokuBoard, stats: dict, doma
     return False 
 
 def _prune_neighbors_visual(domains, r, c, num, board_wrapper):
-    # (Giống logic cắt tỉa FC Visualizer)
     pruned_log = [] 
     n = board_wrapper.n
     box_size = board_wrapper.box_size
@@ -128,8 +122,10 @@ def _prune_neighbors_visual(domains, r, c, num, board_wrapper):
         for bc in range(box_c, box_c + box_size):
             neighbors.add((br, bc))
     neighbors.discard((r, c)) 
+    
+    neighbors_list = list(neighbors)
 
-    yield {"action": "prune_start", "neighbors": list(neighbors), "status": "running"}
+    yield {"action": "prune_start", "neighbors": neighbors_list, "status": "running"}
 
     for (nr, nc) in neighbors:
         if num in domains[nr][nc]:
@@ -137,12 +133,10 @@ def _prune_neighbors_visual(domains, r, c, num, board_wrapper):
             pruned_log.append((nr, nc, num))
             if not domains[nr][nc]:
                 yield {"action": "prune_fail", "cell": (nr, nc), "status": "running"}
-                return (False, pruned_log) 
-    return (True, pruned_log) 
+                return (False, pruned_log, neighbors_list)
+    return (True, pruned_log, neighbors_list)
 
-def _restore_neighbors_visual(domains, pruned_log):
-    # (Giống logic khôi phục FC Visualizer)
-    restored_cells = set((r, c) for (r, c, num) in pruned_log)
-    yield {"action": "restore_start", "neighbors": list(restored_cells), "status": "running"}
+def _restore_neighbors_visual(domains, pruned_log, neighbors_list):
+    yield {"action": "restore_start", "neighbors": neighbors_list, "status": "running"}
     for (r, c, num) in pruned_log:
         domains[r][c].add(num)

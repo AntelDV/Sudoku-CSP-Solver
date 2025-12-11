@@ -1,4 +1,3 @@
-
 import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk
@@ -35,15 +34,12 @@ class MainView(ctk.CTkFrame):
         self.root = root
         self.controller = controller
         
-        # Dữ liệu lưới
         self.cac_o_nhap = {} 
         self.current_n = 9 
-        
-        # Biến trạng thái
         self.algo_var = ctk.StringVar() 
         self.mode_var = ctk.StringVar(value="🤖 Máy Giải") 
         
-        # Widgets
+        # Khai báo Widget
         self.lbl_puzzle_info = None
         self.switch_demo_mode = None
         self.slider_demo_speed = None
@@ -55,18 +51,14 @@ class MainView(ctk.CTkFrame):
         self.sep_1 = None
         self.sep_2 = None
 
-        # Buttons
         self.btn_load_file = None
         self.btn_csv_easy = None
         self.btn_csv_medium = None
         self.btn_csv_hard = None
         self.btn_csv_extreme = None
-        
         self.btn_giai = None
         self.btn_sosanh = None
         self.btn_xoa = None
-        
-        #  Nút Gợi ý
         self.btn_hint = None
         self.btn_check = None 
         
@@ -100,11 +92,103 @@ class MainView(ctk.CTkFrame):
         
         self.tao_khung_dieu_khien(khung_controls_inner)
 
+    def set_buttons_state_on_load(self):
+        """Trạng thái nút khi vừa mở App."""
+        if self.btn_load_file: self.btn_load_file.configure(state="normal")
+        if self.btn_csv_easy: self.btn_csv_easy.configure(state="disabled")
+        if self.btn_csv_medium: self.btn_csv_medium.configure(state="disabled")
+        if self.btn_csv_hard: self.btn_csv_hard.configure(state="disabled")
+        if self.btn_csv_extreme: self.btn_csv_extreme.configure(state="disabled")
+        if self.btn_giai: self.btn_giai.configure(state="disabled")
+        if self.btn_sosanh: self.btn_sosanh.configure(state="disabled")
+        if self.btn_xoa: self.btn_xoa.configure(state="disabled")
+        if self.btn_check: self.btn_check.configure(state="disabled")
+        if self.btn_hint: self.btn_hint.configure(state="disabled")
+
+    def set_buttons_state_csv_loaded(self):
+        """Trạng thái nút khi đã nạp CSV."""
+        self.btn_load_file.configure(state="normal")
+        self.btn_csv_easy.configure(state="normal")
+        self.btn_csv_medium.configure(state="normal")
+        self.btn_csv_hard.configure(state="normal")
+        self.btn_csv_extreme.configure(state="normal")
+        self.btn_giai.configure(state="disabled")
+        self.btn_sosanh.configure(state="disabled")
+        self.btn_xoa.configure(state="disabled")
+        if self.btn_check: self.btn_check.configure(state="disabled")
+        if self.btn_hint: self.btn_hint.configure(state="disabled")
+
+    def set_buttons_state_puzzle_on_grid(self, csv_loaded: bool):
+        """Trạng thái nút khi đã có đề bài trên lưới."""
+        self.btn_load_file.configure(state="normal")
+        self.btn_csv_easy.configure(state="normal")
+        self.btn_csv_medium.configure(state="normal")
+        self.btn_csv_hard.configure(state="normal")
+        self.btn_csv_extreme.configure(state="normal")
+        
+        is_play = (self.mode_var.get() == "👤 Người Chơi")
+        if is_play:
+            self.btn_giai.grid_remove()
+            self.btn_sosanh.grid_remove()
+            if self.btn_check: 
+                self.btn_check.pack(pady=(5, 2))
+                self.btn_check.configure(state="normal")
+            if self.btn_hint:
+                self.btn_hint.pack(pady=(2, 5))
+                self.btn_hint.configure(state="normal")
+        else:
+            self.btn_giai.grid()
+            self.btn_giai.configure(state="normal")
+            self.btn_sosanh.grid()
+            self.btn_sosanh.configure(state="normal")
+            if self.btn_check: self.btn_check.pack_forget()
+            if self.btn_hint: self.btn_hint.pack_forget()
+        
+        self.btn_xoa.configure(state="normal")
+
+    def set_buttons_state_visualizing(self, is_running: bool, csv_loaded: bool):
+        """Khóa giao diện khi đang chạy Demo."""
+        is_demo_mode = self.switch_demo_mode.get()
+        if is_running:
+            self.btn_load_file.configure(state="disabled")
+            self.btn_csv_easy.configure(state="disabled")
+            self.btn_csv_medium.configure(state="disabled")
+            self.btn_csv_hard.configure(state="disabled")
+            self.btn_csv_extreme.configure(state="disabled")
+            self.btn_sosanh.configure(state="disabled")
+            self.btn_xoa.configure(state="disabled")
+            self.switch_demo_mode.configure(state="disabled")
+            self.combo_mode.configure(state="disabled")
+            self.combo_size.configure(state="disabled")
+            if self.btn_check: self.btn_check.configure(state="disabled")
+            if self.btn_hint: self.btn_hint.configure(state="disabled")
+            for r in range(self.current_n):
+                for c in range(self.current_n):
+                    self.cac_o_nhap[(r, c)].configure(state="disabled")
+            if is_demo_mode:
+                self.btn_giai.configure(text="❚❚ DỪNG DEMO", state="normal", fg_color="#E74C3C", hover_color="#EC7063")
+            else:
+                self.btn_giai.configure(state="disabled")
+        else:
+            self.btn_load_file.configure(state="normal")
+            self.switch_demo_mode.configure(state="normal")
+            self.combo_mode.configure(state="normal")
+            self.combo_size.configure(state="normal")
+            if self.controller.current_puzzle_data and self.controller.last_demo_status != "solved":
+                self.load_puzzle_to_grid(self.controller.current_puzzle_data, is_play_mode=(self.mode_var.get() == "👤 Người Chơi"))
+            elif not self.controller.current_puzzle_data:
+                for r in range(self.current_n):
+                    for c in range(self.current_n):
+                        self.cac_o_nhap[(r, c)].configure(state="normal")
+            self.set_buttons_state_puzzle_on_grid(csv_loaded)
+            self.toggle_demo_widgets() 
+            self.btn_giai.configure(fg_color="#28a745", hover_color="#32CD32")
+
+
     def rebuild_grid(self, n):
         self.current_n = n
-        for widget in self.khung_luoi_container.winfo_children():
-            widget.destroy()
-            
+        for widget in self.khung_luoi_container.winfo_children(): widget.destroy()
+        
         max_width = 800 
         max_height = 800
         cell_size = min(max_width // n, max_height // n)
@@ -157,7 +241,7 @@ class MainView(ctk.CTkFrame):
             font=ctk.CTkFont(size=36, weight="bold"), text_color="#38bdf8"
         ).pack(expand=True)
         
-        #  Chọn Size
+        # Chọn Size
         khung_size = ctk.CTkFrame(parent, fg_color="transparent")
         khung_size.pack(fill="x", pady=2)
         ctk.CTkLabel(khung_size, text="Kích thước:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=5)
@@ -168,7 +252,7 @@ class MainView(ctk.CTkFrame):
         self.combo_size.set("9x9 (Chuẩn)")
         self.combo_size.pack(side="right", padx=5, fill="x", expand=True)
 
-        #  Nạp đề
+        # Nạp đề
         self.tao_khung_nap_de(parent)
         self.sep_1 = ctk.CTkFrame(parent, height=2, fg_color="#334155")
         self.sep_1.pack(fill="x", padx=0, pady=5)
@@ -176,18 +260,20 @@ class MainView(ctk.CTkFrame):
         # Chọn chế độ
         self.tao_khung_che_do(parent) 
         
-        #  Hành động
+        # Hành động
         self.tao_khung_hanh_dong(parent)
         self.sep_2 = ctk.CTkFrame(parent, height=2, fg_color="#334155")
         self.sep_2.pack(fill="x", padx=0, pady=5)
 
-        #  Demo Tools & Numpad
+        # Demo Tools & Numpad
         self.tao_khung_che_do_demo(parent)
         self.frame_numpad = ctk.CTkFrame(parent, fg_color="transparent")
         self.rebuild_numpad(self.current_n)
         
         self.set_controller_references()
         self.toggle_demo_widgets()
+        
+        # GỌI HÀM KHỞI TẠO NÚT
         self.set_buttons_state_on_load()
 
     def rebuild_numpad(self, n):
@@ -283,7 +369,6 @@ class MainView(ctk.CTkFrame):
             self.btn_sosanh.grid()
             self.combo_fast_solve.pack(pady=(5, 5))
             
-            # Ẩn nút người chơi
             self.btn_check.pack_forget()
             self.btn_hint.pack_forget()
             
@@ -299,7 +384,12 @@ class MainView(ctk.CTkFrame):
         self.algo_var.set('Backtracking (Baseline)') 
         self.combo_fast_solve = ctk.CTkComboBox(
             khung_hanh_dong, variable=self.algo_var, font=ctk.CTkFont(size=13),
-            values=['Backtracking (Baseline)', 'Forward Checking (Cải tiến)', 'FC + MRV (Nâng cao)'], 
+            values=[
+                'Backtracking (Baseline)', 
+                'Forward Checking (Cải tiến)', 
+                'FC + MRV (Nâng cao)',
+                'Dancing Links (DLX - Trùm)'
+            ], 
             state="readonly", height=30, width=220
         )
         self.combo_fast_solve.pack(pady=(5, 5))
@@ -345,8 +435,13 @@ class MainView(ctk.CTkFrame):
     def show_fast_solve_stats(self, stats: dict):
         time_val = stats.get('execution_time_sec', 0)
         backtracks_val = stats.get('backtracks', 0)
+        
+        if backtracks_val == "N/A (DLX Logic)":
+            self.lbl_fast_solve_backtracks.configure(text=f"Nodes: {stats.get('nodes_visited', 0):,}")
+        else:
+            self.lbl_fast_solve_backtracks.configure(text=f"Số bước quay lui: {backtracks_val:,}")
+            
         self.lbl_fast_solve_time.configure(text=f"Thời gian thực thi: {time_val:.6f} s")
-        self.lbl_fast_solve_backtracks.configure(text=f"Số bước quay lui: {backtracks_val:,}")
         self.khung_ket_qua_nhanh.pack(fill="x", pady=(5,0))
 
     def clear_fast_solve_stats(self):
@@ -380,11 +475,15 @@ class MainView(ctk.CTkFrame):
     def get_selected_algorithm(self) -> (str, bool):
         selected = self.algo_var.get()
         is_demo = self.switch_demo_mode.get()
-        if "FC + MRV" in selected: algo_key = "fc_mrv"
+        
+        algo_key = "bt"
+        if "Dancing Links" in selected: algo_key = "dlx"
+        elif "FC + MRV" in selected: algo_key = "fc_mrv"
         elif "Forward Checking" in selected: algo_key = "fc"
-        else: algo_key = "bt"
+        
         if is_demo:
-            if algo_key == "fc_mrv": return "visualizer_mrv", True 
+            if algo_key == "dlx": return "visualizer_dlx", True
+            elif algo_key == "fc_mrv": return "visualizer_mrv", True 
             elif algo_key == "fc": return "visualizer_fc", True
             else: return "visualizer_bt", True
         return algo_key, False
@@ -427,9 +526,9 @@ class MainView(ctk.CTkFrame):
                 o_nhap_lieu.delete(0, "end")
                 o_nhap_lieu.insert(0, SudokuConverter.int_to_char(val_giai))
                 if val_goc != 0:
-                    o_nhap_lieu.configure(state='disabled', fg_color=MAU_O_GOC_FG[0], text_color=MAU_O_GOC_TEXT[0], border_width=1, border_color = MAU_VIEN_LUOI[0]) 
+                    o_nhap_lieu.configure(state='disabled', fg_color=MAU_O_GOC_FG[0], text_color=MAU_O_GOC_TEXT[0]) 
                 else:
-                    o_nhap_lieu.configure(state='normal', fg_color=MAU_O_BINH_THUONG[0], text_color=MAU_O_GIAI_TEXT[0], border_width=1, border_color = MAU_VIEN_LUOI[0]) 
+                    o_nhap_lieu.configure(state='normal', fg_color=MAU_O_BINH_THUONG[0], text_color=MAU_O_GIAI_TEXT[0]) 
                 o_nhap_lieu.configure(state='disabled')
 
     def clear_grid_and_stats(self):
@@ -472,11 +571,12 @@ class MainView(ctk.CTkFrame):
     
     def mark_error_cell(self, r, c, is_error: bool):
         o_nhap_lieu = self.cac_o_nhap[(r, c)]
+        o_nhap_lieu.configure(border_width=3 if is_error else 1)
         if o_nhap_lieu.cget("state") == "normal":
             if is_error:
-                o_nhap_lieu.configure(fg_color="#f8d7da", text_color="#721c24") 
+                o_nhap_lieu.configure(fg_color="#f8d7da", text_color="#721c24", border_color=MAU_O_LOI) 
             else:
-                o_nhap_lieu.configure(fg_color=MAU_O_BINH_THUONG[0], text_color=MAU_O_GIAI_TEXT[0])
+                o_nhap_lieu.configure(fg_color=MAU_O_BINH_THUONG[0], text_color=MAU_O_GIAI_TEXT[0], border_color=MAU_VIEN_LUOI[0])
 
     def highlight_hint_cell(self, r, c):
         o_nhap_lieu = self.cac_o_nhap[(r, c)]
@@ -490,113 +590,34 @@ class MainView(ctk.CTkFrame):
         else:
             if o_nhap_lieu.cget("state") == "normal":
                 o_nhap_lieu.configure(border_color=MAU_VIEN_LUOI[0], border_width=1)
-            
-    def set_buttons_state_on_load(self):
-        self.btn_load_file.configure(state="normal")
-        self.btn_csv_easy.configure(state="disabled")
-        self.btn_csv_medium.configure(state="disabled")
-        self.btn_csv_hard.configure(state="disabled")
-        self.btn_csv_extreme.configure(state="disabled")
-        self.btn_giai.configure(state="disabled")
-        self.btn_sosanh.configure(state="disabled")
-        self.btn_xoa.configure(state="disabled")
-        if self.btn_check: self.btn_check.configure(state="disabled")
-        if self.btn_hint: self.btn_hint.configure(state="disabled")
-
-    def set_buttons_state_csv_loaded(self):
-        self.btn_load_file.configure(state="normal")
-        self.btn_csv_easy.configure(state="normal")
-        self.btn_csv_medium.configure(state="normal")
-        self.btn_csv_hard.configure(state="normal")
-        self.btn_csv_extreme.configure(state="normal")
-        self.btn_giai.configure(state="disabled")
-        self.btn_sosanh.configure(state="disabled")
-        self.btn_xoa.configure(state="disabled")
-        if self.btn_check: self.btn_check.configure(state="disabled")
-        if self.btn_hint: self.btn_hint.configure(state="disabled")
-
-    def set_buttons_state_puzzle_on_grid(self, csv_loaded: bool):
-        self.btn_load_file.configure(state="normal")
-        state_csv = "normal" if csv_loaded else "disabled"
-        self.btn_csv_easy.configure(state="normal")
-        self.btn_csv_medium.configure(state="normal")
-        self.btn_csv_hard.configure(state="normal")
-        self.btn_csv_extreme.configure(state="normal")
-        is_play = (self.mode_var.get() == "👤 Người Chơi")
-        if is_play:
-            self.btn_giai.grid_remove()
-            self.btn_sosanh.grid_remove()
-            if self.btn_check: 
-                self.btn_check.pack(pady=(5, 2))
-                self.btn_check.configure(state="normal")
-            if self.btn_hint:
-                self.btn_hint.pack(pady=(2, 5))
-                self.btn_hint.configure(state="normal")
-        else:
-            self.btn_giai.grid()
-            self.btn_giai.configure(state="normal")
-            self.btn_sosanh.grid()
-            self.btn_sosanh.configure(state="normal")
-            if self.btn_check: self.btn_check.pack_forget()
-            if self.btn_hint: self.btn_hint.pack_forget()
-        self.btn_xoa.configure(state="normal")
-
-    def set_buttons_state_visualizing(self, is_running: bool, csv_loaded: bool):
-        is_demo_mode = self.switch_demo_mode.get()
-        if is_running:
-            self.btn_load_file.configure(state="disabled")
-            self.btn_csv_easy.configure(state="disabled")
-            self.btn_csv_medium.configure(state="disabled")
-            self.btn_csv_hard.configure(state="disabled")
-            self.btn_csv_extreme.configure(state="disabled")
-            self.btn_sosanh.configure(state="disabled")
-            self.btn_xoa.configure(state="disabled")
-            self.switch_demo_mode.configure(state="disabled")
-            self.combo_mode.configure(state="disabled")
-            self.combo_size.configure(state="disabled")
-            if self.btn_check: self.btn_check.configure(state="disabled")
-            if self.btn_hint: self.btn_hint.configure(state="disabled")
-            for r in range(self.current_n):
-                for c in range(self.current_n):
-                    self.cac_o_nhap[(r, c)].configure(state="disabled")
-            if is_demo_mode:
-                self.btn_giai.configure(text="❚❚ DỪNG DEMO", state="normal", fg_color="#E74C3C", hover_color="#EC7063")
-            else:
-                self.btn_giai.configure(state="disabled")
-        else:
-            self.btn_load_file.configure(state="normal")
-            self.switch_demo_mode.configure(state="normal")
-            self.combo_mode.configure(state="normal")
-            self.combo_size.configure(state="normal")
-            if self.controller.current_puzzle_data and self.controller.last_demo_status != "solved":
-                self.load_puzzle_to_grid(self.controller.current_puzzle_data, is_play_mode=(self.mode_var.get() == "👤 Người Chơi"))
-            elif not self.controller.current_puzzle_data:
-                for r in range(self.current_n):
-                    for c in range(self.current_n):
-                        self.cac_o_nhap[(r, c)].configure(state="normal")
-            self.set_buttons_state_puzzle_on_grid(csv_loaded)
-            self.toggle_demo_widgets() 
-            self.btn_giai.configure(fg_color="#28a745", hover_color="#32CD32")
 
     def cap_nhat_o_visual(self, data: dict, puzzle_data: list):
         if not puzzle_data: return
         action = data.get("action")
-        self.reset_all_cells_visual(puzzle_data)
+        
+        if action in ["try", "backtrack"] and "Dancing Links" in self.algo_var.get():
+             self.lbl_demo_stats.configure(text=f"Số bước (Steps): {data.get('stats', {}).get('backtracks', 0):,}")
+
         if action == "try":
             r, c = data["cell"]
             num = data["num"]
-            o = self.cac_o_nhap[(r, c)]
-            o.configure(state="normal")
-            o.delete(0, "end")
-            o.insert(0, SudokuConverter.int_to_char(num))
-            o.configure(state="disabled", fg_color=MAU_NEN_THU, text_color=MAU_CHU_THU, border_width=2)
+            if puzzle_data[r][c] == 0:
+                o = self.cac_o_nhap[(r, c)]
+                o.configure(state="normal")
+                o.delete(0, "end")
+                o.insert(0, SudokuConverter.int_to_char(num))
+                o.configure(state="disabled", fg_color=MAU_NEN_THU, text_color=MAU_CHU_THU, border_width=2)
+            
         elif action == "backtrack":
             r, c = data["cell"]
-            o = self.cac_o_nhap[(r, c)]
-            o.configure(state="normal")
-            o.delete(0, "end")
-            o.configure(state="disabled", fg_color=MAU_NEN_QUAY_LUI, text_color=MAU_CHU_QUAY_LUI, border_width=2)
-            self.lbl_demo_stats.configure(text=f"Số bước lui: {data['stats']['backtracks']:,}")
+            if puzzle_data[r][c] == 0:
+                o = self.cac_o_nhap[(r, c)]
+                o.configure(state="normal")
+                o.delete(0, "end")
+                o.configure(state="disabled", fg_color=MAU_NEN_QUAY_LUI, text_color=MAU_CHU_QUAY_LUI, border_width=2)
+            if 'stats' in data and "Dancing Links" not in self.algo_var.get():
+                self.lbl_demo_stats.configure(text=f"Số bước lui: {data['stats']['backtracks']:,}")
+                
         elif action == "prune_start":
             for (nr, nc) in data["neighbors"]:
                 if (nr, nc) in self.cac_o_nhap:
@@ -604,13 +625,14 @@ class MainView(ctk.CTkFrame):
                         self.cac_o_nhap[(nr, nc)].configure(border_color=MAU_VIEN_HANG_XOM, border_width=4)
         elif action == "prune_fail":
             self.cac_o_nhap[data["cell"]].configure(border_color=MAU_NEN_QUAY_LUI, border_width=5)
+        
         elif action == "restore_start":
             for (nr, nc) in data["neighbors"]:
                  if (nr, nc) in self.cac_o_nhap:
                      if puzzle_data[nr][nc] == 0:
-                        self.cac_o_nhap[(nr, nc)].configure(border_color=MAU_VIEN_KHOI_PHUC, border_width=2)
-        if data.get("status") in ("solved", "failed") and 'stats' in data:
-             self.lbl_demo_stats.configure(text=f"Số bước lui: {data['stats']['backtracks']:,}")
+                        self.cac_o_nhap[(nr, nc)].configure(border_color=MAU_VIEN_LUOI, border_width=1)
+                     else:
+                        self.cac_o_nhap[(nr, nc)].configure(border_color=MAU_VIEN_LUOI, border_width=1)
      
     def reset_all_cells_visual(self, puzzle_data: list):
         if not puzzle_data: return

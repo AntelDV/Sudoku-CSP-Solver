@@ -3,7 +3,6 @@ from .sudoku_board import SudokuBoard
 def solve_forward_checking_visual(board_wrapper: SudokuBoard, stats: dict):
     """
     Generator Visualizer cho Forward Checking.
-    Bổ sung các bước báo hiệu Cắt tỉa (Prune) và Khôi phục (Restore).
     """
     try:
         domains = _initialize_domains(board_wrapper)
@@ -14,7 +13,6 @@ def solve_forward_checking_visual(board_wrapper: SudokuBoard, stats: dict):
     yield from _solve_fc_recursive_visual(board_wrapper, stats, domains)
 
 def _initialize_domains(board_wrapper):
-    # Quy trình khởi tạo domain giống Profiler FC
     n = board_wrapper.n
     board = board_wrapper.get_board()
     full_domain = set(range(1, n + 1))
@@ -30,7 +28,6 @@ def _initialize_domains(board_wrapper):
     return domains
 
 def _prune_domains_on_setup(domains, r, c, num, board_wrapper):
-    # Quy trình cắt tỉa ban đầu giống Profiler FC
     n = board_wrapper.n
     box_size = board_wrapper.box_size
     for col in range(n):
@@ -65,8 +62,8 @@ def _solve_fc_recursive_visual(board_wrapper: SudokuBoard, stats: dict, domains:
         # Báo hiệu: Đang thử điền
         yield {"action": "try", "cell": (row, col), "num": num, "status": "running"}
 
-        # Thực hiện và Báo hiệu Cắt tỉa
-        is_consistent, pruned_log = yield from _prune_neighbors_visual(domains, row, col, num, board_wrapper)
+        # Thực hiện Cắt tỉa - Lấy về cả neighbors để sau này restore màu
+        is_consistent, pruned_log, neighbors_list = yield from _prune_neighbors_visual(domains, row, col, num, board_wrapper)
         
         if is_consistent:
             result = yield from _solve_fc_recursive_visual(board_wrapper, stats, domains)
@@ -75,8 +72,8 @@ def _solve_fc_recursive_visual(board_wrapper: SudokuBoard, stats: dict, domains:
         # Quay lui
         stats["backtracks"] = stats.get("backtracks", 0) + 1
         
-        # Thực hiện và Báo hiệu Khôi phục (Undo Cắt tỉa)
-        yield from _restore_neighbors_visual(domains, pruned_log)
+        # Báo hiệu Khôi phục (Truyền neighbors_list để dọn màu xanh)
+        yield from _restore_neighbors_visual(domains, pruned_log, neighbors_list)
         
         board_wrapper.set_cell(row, col, 0)
         yield {"action": "backtrack", "cell": (row, col), "stats": stats, "status": "running"}
@@ -99,9 +96,11 @@ def _prune_neighbors_visual(domains, r, c, num, board_wrapper):
         for bc in range(box_c, box_c + box_size):
             neighbors.add((br, bc))
     neighbors.discard((r, c)) 
+    
+    neighbors_list = list(neighbors)
 
-    # Báo hiệu bắt đầu cắt tỉa
-    yield {"action": "prune_start", "neighbors": list(neighbors), "status": "running"}
+    # Báo hiệu bắt đầu cắt tỉa (Tô xanh)
+    yield {"action": "prune_start", "neighbors": neighbors_list, "status": "running"}
 
     for (nr, nc) in neighbors:
         if num in domains[nr][nc]:
@@ -110,14 +109,14 @@ def _prune_neighbors_visual(domains, r, c, num, board_wrapper):
             if not domains[nr][nc]:
                 # Nếu cắt tỉa thất bại -> Báo hiệu tô đỏ
                 yield {"action": "prune_fail", "cell": (nr, nc), "status": "running"}
-                return (False, pruned_log) 
-    return (True, pruned_log) 
+                return (False, pruned_log, neighbors_list)
+    return (True, pruned_log, neighbors_list)
 
-def _restore_neighbors_visual(domains, pruned_log):
+def _restore_neighbors_visual(domains, pruned_log, neighbors_list):
     """
-    Generator khôi phục: Gửi thông báo 'restore_start' để UI tô viền xám.
+    Generator khôi phục: Gửi thông báo 'restore_start' để UI xóa màu xanh.
     """
-    restored_cells = set((r, c) for (r, c, num) in pruned_log)
-    yield {"action": "restore_start", "neighbors": list(restored_cells), "status": "running"}
+    yield {"action": "restore_start", "neighbors": neighbors_list, "status": "running"}
+    
     for (r, c, num) in pruned_log:
         domains[r][c].add(num)

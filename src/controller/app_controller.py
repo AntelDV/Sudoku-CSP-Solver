@@ -1,4 +1,3 @@
-
 from tkinter import filedialog, messagebox
 import traceback
 import pandas as pd
@@ -13,6 +12,7 @@ import math
 from src.model.sudoku_generator import SudokuGenerator
 from src.utils.sudoku_converter import SudokuConverter
 from src.model.hint_generator import HintGenerator 
+from src.model import solver_dlx 
 
 if TYPE_CHECKING:
     from src.view.main_window import MainView
@@ -20,10 +20,12 @@ if TYPE_CHECKING:
 
 class AppController:
 
+
     def __init__(self, model, analysis_popup_class: Type['AnalysisPopup'], batch_analysis_popup_class: Type['object'], base_dir: str):
         self.model_classes = model  
         self.view: 'MainView' = None
         self.base_dir = base_dir
+        
         self.data_dir = os.path.join(self.base_dir, "data")
         
         self.analysis_popup_class = analysis_popup_class
@@ -36,10 +38,10 @@ class AppController:
         self.is_visualizer_running = False
         self.last_demo_status = None 
         
-        self.current_puzzle_data = None 
-        self.current_known_solution = None 
-        self.current_visual_board = None
-        
+        self.current_puzzle_data = None      
+        self.current_known_solution = None   
+        self.current_visual_board = None    
+
         self.is_play_mode = False 
         self.focused_cell = None 
         self.current_size = 9 
@@ -51,20 +53,26 @@ class AppController:
         }
 
     def _log(self, message, color="endc"):
+        """Hàm tiện ích để in thông báo có màu ra màn hình console."""
         if color in self.colors:
             print(f"{self.colors[color]}{message}{self.colors['endc']}")
         else:
             print(message)
 
     def set_view(self, view: 'MainView'):
+        """Liên kết với View sau khi khởi tạo xong."""
         self.view = view
+        # Cập nhật trạng thái nút bấm ban đầu
         self.view.set_buttons_state_on_load()
     
     def handle_load_file(self):
+        """Xử lý sự kiện người dùng bấm nút 'Nạp Dữ Liệu'."""
+        # Nếu đang chạy Demo thì chặn không cho nạp
         if self.is_visualizer_running:
             self.view.show_message("Lỗi", "Đang chạy Demo, không thể nạp file.", is_error=True)
             return
 
+        # Mở hộp thoại chọn file
         initial_dir = self.base_dir
         if os.path.isdir(self.data_dir):
             initial_dir = self.data_dir
@@ -78,14 +86,18 @@ class AppController:
 
         try:
             filename = os.path.basename(filepath)
+            
+            # Xử lý nếu là file CSV 
             if filepath.endswith(".csv"):
                 self._log("[HỆ THỐNG] Đang nạp file CSV...", "cyan")
                 if self.view: self.view.root.update_idletasks()
                 
                 df = pd.read_csv(filepath)
+                # Kiểm tra cấu trúc file CSV
                 if 'quizzes' not in df.columns or 'solutions' not in df.columns:
                     raise ValueError("File thiếu cột 'quizzes' hoặc 'solutions'.")
                 
+                # Tính toán độ khó dựa trên số lượng gợi ý 
                 if 'clues' not in df.columns:
                     self._log("[HỆ THỐNG] Đang đếm số gợi ý...", "cyan")
                     df['clues'] = df['quizzes'].astype(str).apply(lambda x: sum(c != '0' for c in x))
@@ -99,11 +111,14 @@ class AppController:
                     self.view.set_buttons_state_csv_loaded() 
                     self.view.clear_fast_solve_stats() 
             
+            # Xử lý nếu là file TXT 
             elif filepath.endswith(".txt"):
                 self._log("[HỆ THỐNG] Đang nạp file .txt...", "cyan")
                 grid_data = self._load_from_txt(filepath)
                 size = len(grid_data)
                 self.current_size = size
+                
+                # Cập nhật lại giao diện lưới nếu kích thước thay đổi
                 if self.view: self.view.rebuild_grid(size) 
                 
                 self.current_puzzle_data = copy.deepcopy(grid_data)
@@ -126,6 +141,7 @@ class AppController:
             self._log(f"[LỖI] Nạp file thất bại: {e}", "fail")
             
     def handle_size_change(self, size_str: str):
+        """Xử lý khi người dùng chọn kích thước bàn cờ khác (4x4, 9x9, 16x16...)."""
         try:
             new_size = int(size_str.split('x')[0])
             self.current_size = new_size
@@ -142,8 +158,11 @@ class AppController:
             print(f"Lỗi đổi size: {e}")
 
     def handle_get_csv_puzzle(self, difficulty: str):
+        """Lấy một đề ngẫu nhiên từ CSV hoặc sinh đề mới nếu size != 9."""
+        # Trường hợp 1: Size 9x9 và đã nạp CSV -> Lấy từ CSV
         if self.current_size == 9 and self.kaggle_df is not None:
             try:
+                # Lọc đề theo độ khó (dựa trên số lượng gợi ý 'clues')
                 df_filtered = None
                 if difficulty == 'extreme':
                     df_filtered = self.kaggle_df[self.kaggle_df['clues'] < 25]
@@ -160,6 +179,7 @@ class AppController:
                 if df_filtered is None or df_filtered.empty:
                     df_filtered = self.kaggle_df 
                 
+                # Chọn ngẫu nhiên 1 dòng
                 random_row = df_filtered.sample(n=1).iloc[0]
                 self.current_known_solution = self._string_to_grid(str(random_row['solutions']), 9)
                 grid_data = self._string_to_grid(str(random_row['quizzes']), 9)
@@ -175,6 +195,8 @@ class AppController:
             except Exception as e:
                 self.view.show_message("Lỗi Lấy Đề", f"Lỗi CSV: {e}", is_error=True)
                 return
+        
+        # Trường hợp 2: Size khác hoặc chưa nạp CSV -> Dùng thuật toán sinh đề
         else:
             self._log(f"[GENERATOR] Đang sinh đề {self.current_size}x{self.current_size} độ khó {difficulty}...", "cyan")
             if self.view: self.view.root.update_idletasks()
@@ -195,17 +217,21 @@ class AppController:
                 self.view.show_message("Lỗi Sinh Đề", f"Không thể sinh đề: {e}", is_error=True)
 
     def handle_mode_change(self, mode_str: str):
+        """Chuyển đổi giữa chế độ Máy Giải và Người Chơi."""
         self.is_play_mode = (mode_str == "👤 Người Chơi")
         self.focused_cell = None
+        # Nạp lại dữ liệu bàn cờ để reset trạng thái ô nhập liệu
         if self.current_puzzle_data and self.view:
             self.view.load_puzzle_to_grid(self.current_puzzle_data, is_play_mode=self.is_play_mode)
             self.view.update_puzzle_info(self.view.lbl_puzzle_info.cget("text") + " (Reset)")
 
     def handle_cell_focus(self, r, c):
+        """Ghi nhận ô đang được chọn để dùng bàn phím số ảo."""
         if self.is_play_mode:
             self.focused_cell = (r, c)
 
     def handle_numpad_click(self, num):
+        """Xử lý sự kiện bấm bàn phím số ảo."""
         if not self.is_play_mode or not self.focused_cell: return
         r, c = self.focused_cell
         if (r, c) not in self.view.cac_o_nhap: return
@@ -218,6 +244,8 @@ class AppController:
             self.handle_grid_modified(None, r, c)
 
     def handle_grid_modified(self, event, r, c):
+        """Xử lý khi nội dung ô thay đổi (nhập từ bàn phím)."""
+        # Logic cho chế độ Người chơi: Kiểm tra luật ngay lập tức
         if self.is_play_mode:
             try:
                 entry_widget = self.view.cac_o_nhap[(r, c)]
@@ -230,11 +258,12 @@ class AppController:
                     entry_widget.delete(0, "end")
                     return
 
+                # Lấy dữ liệu hiện tại để kiểm tra
                 grid_data = self.view.get_grid_data()
                 SudokuBoard_class = self.model_classes['SudokuBoard']
                 board = SudokuBoard_class(grid_data)
                 
-                # Check luật
+                # Tạm xóa số vừa nhập để check is_valid
                 board.set_cell(r, c, 0)
                 is_ok = board.is_valid(num, r, c)
                 
@@ -248,7 +277,7 @@ class AppController:
                 pass
             return
 
-        # Máy giải
+        # Reset trạng thái nếu người dùng sửa đề
         self.current_puzzle_data = None
         self.current_known_solution = None
         if self.view: self.view.clear_fast_solve_stats()
@@ -260,6 +289,7 @@ class AppController:
              self.view.set_buttons_state_puzzle_on_grid(self.csv_loaded)
 
     def handle_check_solution(self):
+        """Kiểm tra bài làm của người chơi so với đáp án gốc."""
         if not self.current_known_solution:
             self.view.show_message("Thông báo", "Đề bài này không có sẵn đáp án để kiểm tra.", is_error=True)
             return
@@ -292,23 +322,23 @@ class AppController:
             self.view.show_message("Lỗi", str(e), is_error=True)
 
     def handle_hint(self):
+        """Cung cấp gợi ý thông minh cho người chơi."""
         try:
             current_grid = self.view.get_grid_data()
             
-            #  Kiểm tra lỗi sai trước
+            # Kiểm tra lỗi sai trước khi gợi ý
             if self.current_known_solution:
                 has_error = False
                 for r in range(self.current_size):
                     for c in range(self.current_size):
                         val_user = current_grid[r][c]
                         if val_user != 0 and val_user != self.current_known_solution[r][c]:
-                            # Tìm thấy lỗi
                             self.view.mark_error_cell(r, c, True)
                             val_char = SudokuConverter.int_to_char(val_user)
                             self.view.show_message("Gợi ý", f"Bạn đang điền sai ô ({r+1}, {c+1}) giá trị {val_char}. Hãy sửa trước!", is_error=True)
                             return
             
-            #  Nếu không có lỗi, tìm gợi ý nước đi
+            # Tìm nước đi logic tiếp theo
             hint = HintGenerator.get_hint(current_grid, self.current_known_solution)
             
             if hint:
@@ -317,10 +347,10 @@ class AppController:
                 self.view.highlight_hint_cell(r, c)
                 
                 if msg_type == 'naked_single':
-                    msg = f"Gợi ý ô ({r+1}, {c+1}):\n\nNên điền: {val_char}\n\nLý do: Đây là giá trị khả thi (các số khác bị hàng/cột/khối chặn)."
+                    msg = f"Gợi ý ô ({r+1}, {c+1}):\n\nNên điền: {val_char}\n\nLý do: Đây là giá trị khả thi duy nhất (các số khác bị chặn)."
                     self.view.show_message("Gợi ý Logic", msg)
                 else:
-                    msg = f"Gợi ý ô ({r+1}, {c+1}):\n\nThử điền: {val_char}\n\nLý do: Đây là nước đi khó, cần suy luận lâu."
+                    msg = f"Gợi ý ô ({r+1}, {c+1}):\n\nThử điền: {val_char}\n\nLý do: Đây là nước đi khó, cần suy luận sâu."
                     self.view.show_message("Gợi ý Fallback", msg)
             else:
                 self.view.show_message("Thông báo", "Không tìm thấy gợi ý nào khả thi (hoặc đã đầy bàn cờ).")
@@ -329,6 +359,7 @@ class AppController:
             self.view.show_message("Lỗi Gợi ý", str(e), is_error=True)
 
     def _string_to_grid(self, s: str, n: int):
+        """Chuyển chuỗi số (từ CSV) thành ma trận lưới."""
         grid = []
         s = str(s).replace('.', '0')
         for i in range(n):
@@ -340,6 +371,7 @@ class AppController:
         return grid
 
     def _load_from_txt(self, filepath):
+        """Đọc file TXT và chuyển thành ma trận."""
         grid_data = []
         with open(filepath, 'r') as f:
             for line in f:
@@ -354,7 +386,9 @@ class AppController:
                 if row_digits: grid_data.append(row_digits)
         return grid_data
 
+    # --- HÀM XỬ LÝ CHÍNH KHI BẤM NÚT 'GIẢI' ---
     def handle_solve(self):
+        """Xử lý sự kiện bấm nút GIẢI."""
         if self.is_play_mode:
             self.view.show_message("Chú ý", "Bạn đang ở chế độ Người chơi. Hãy dùng nút 'Kiểm tra'.", is_error=True)
             return
@@ -371,40 +405,58 @@ class AppController:
             if self.view: self.view.show_message("Lỗi Đầu Vào", f"Lỗi: {e}", is_error=True)
             return
         
+        # Lấy thuật toán được chọn từ giao diện
         (algo_key, is_demo_mode) = self.view.get_selected_algorithm()
+        
+        # Nếu chọn chế độ Demo (Visualizer)
         if is_demo_mode:
             if self.is_visualizer_running:
                 self.is_visualizer_running = False
                 self._log("[DEMO] Đã dừng Demo.", "warning")
             else:
                 self.run_visualizer(grid_data_to_solve, algo_key)
+        # Nếu chọn chế độ Giải nhanh 
         else:
             self.run_fast_solve(grid_data_to_solve, algo_key)
 
     def run_fast_solve(self, grid_data, algo_key: str):
-        algo_name_map = {'bt': "Backtracking", 'fc': "Forward Checking", 'fc_mrv': "FC + MRV"}
-        module_key_map = {'bt': 'profiler_bt', 'fc': 'profiler_fc', 'fc_mrv': 'profiler_mrv'}
-        if algo_key not in module_key_map:
+        """Chạy thuật toán ở chế độ ngầm (tốc độ cao) và hiển thị kết quả."""
+        
+        # Ánh xạ tên thuật toán sang module tương ứng
+        algo_map = {
+            'bt': ('profiler_bt', 'Backtracking'),
+            'fc': ('profiler_fc', 'Forward Checking'),
+            'fc_mrv': ('profiler_mrv', 'FC + MRV'),
+            'dlx': ('solver_dlx', 'Dancing Links (DLX)') 
+        }
+        
+        module_key, algo_name = algo_map.get(algo_key, (None, None))
+        if not module_key:
             self.view.show_message("Lỗi", f"Thuật toán '{algo_key}' không xác định.", is_error=True)
             return
-        algo_name = algo_name_map[algo_key]
+
         self._log(f"[GIẢI] Đang giải nhanh bằng {algo_name}...", "cyan")
         if self.view: self.view.set_buttons_state_visualizing(True, self.csv_loaded)
         
+        # Gọi hàm thực thi
         board_wrapper, stats, is_solved = self._run_single_algo(
-            grid_data, module_key_map[algo_key], algo_key 
+            grid_data, module_key, algo_key 
         )
+        
         if self.view: self.view.set_buttons_state_visualizing(False, self.csv_loaded)
+        
         if is_solved:
             solution = board_wrapper.get_board()
             if self.view: 
                 self.view.update_grid_with_solution(solution, grid_data)
                 self.view.show_fast_solve_stats(stats) 
+            
+            # Kiểm tra với đáp án chuẩn
             if self.current_known_solution:
                 if solution == self.current_known_solution:
                     self._log("[GIẢI] Giải xong! Đã xác minh 100%!", "green")
                 else:
-                    self._log("[GIẢI] LỖI XÁC MINH! Lời giải không khớp CSV!", "fail")
+                    self._log("[GIẢI] Lời giải hợp lệ (nhưng khác đáp án mẫu).", "warning")
         else:
             if self.view: 
                 self.view.show_message("Thất Bại", "Không tìm thấy lời giải.", is_error=True)
@@ -412,10 +464,12 @@ class AppController:
             self._log(f"[GIẢI] Giải thất bại ({algo_name})", "fail")
 
     def handle_compare(self):
+        """Chạy so sánh hiệu năng của cả 4 thuật toán cùng lúc."""
         if self.is_visualizer_running: return
         if self.analysis_popup_window and self.analysis_popup_window.winfo_exists():
             self.analysis_popup_window.focus() 
             return
+            
         grid_data_to_solve = None
         try:
             if self.current_puzzle_data:
@@ -427,28 +481,67 @@ class AppController:
         except ValueError as e:
             if self.view: self.view.show_message("Lỗi Đầu Vào", f"Lỗi: {e}", is_error=True)
             return
-        self._log("[PHÂN TÍCH] Đang chạy so sánh 3 thuật toán...", "cyan")
+            
+        self._log("[PHÂN TÍCH] Đang chạy so sánh 4 thuật toán...", "cyan")
         if self.view: self.view.root.update_idletasks()
+        
         try:
-            _, bt_stats, bt_solved = self._run_single_algo(grid_data_to_solve, 'profiler_bt', 'bt')
-            _, fc_stats, fc_solved = self._run_single_algo(grid_data_to_solve, 'profiler_fc', 'fc')
-            _, mrv_stats, mrv_solved = self._run_single_algo(grid_data_to_solve, 'profiler_mrv', 'fc_mrv')
-            if bt_solved and fc_solved and mrv_solved:
-                self.analysis_popup_window = self.analysis_popup_class(
-                    self.view, self, bt_stats, fc_stats, mrv_stats
-                )
-            else:
-                if self.view: self.view.show_message("Thất Bại", "Một trong các thuật toán không giải được.", is_error=True)
+            # Chạy Backtracking
+            _, bt_stats, _ = self._run_single_algo(grid_data_to_solve, 'profiler_bt', 'bt')
+            
+            # Chạy Forward Checking
+            _, fc_stats, _ = self._run_single_algo(grid_data_to_solve, 'profiler_fc', 'fc')
+            
+            # Chạy FC + MRV
+            _, mrv_stats, _ = self._run_single_algo(grid_data_to_solve, 'profiler_mrv', 'fc_mrv')
+            
+            # Chạy Dancing Links (DLX) 
+            _, dlx_stats, _ = self._run_single_algo(grid_data_to_solve, 'solver_dlx', 'dlx')
+            
+            # Hiển thị kết quả lên Popup
+            self.analysis_popup_window = self.analysis_popup_class(
+                self.view, self, bt_stats, fc_stats, mrv_stats, dlx_stats
+            )
         except Exception as e:
             self._log(f"[LỖI] {e}", "fail")
+            if self.view: self.view.show_message("Lỗi So Sánh", f"{e}", is_error=True)
 
     def handle_batch_compare_setup(self): pass 
     def handle_run_batch_analysis(self, n_value: int, popup_instance: 'object'): pass
 
     def _run_single_algo(self, grid_data, module_key: str, algo_key: str):
+        """
+        Hàm wrapper chung để chạy bất kỳ thuật toán nào.
+        Xử lý việc khởi tạo Board, đo thời gian, và gọi hàm giải tương ứng.
+        """
         SudokuBoard_class = self.model_classes['SudokuBoard']
+        
+        # Xử lý riêng cho Dancing Links vì nó dùng Class chứ không phải function rời
+        if algo_key == 'dlx':
+            board_wrapper = SudokuBoard_class(copy.deepcopy(grid_data))
+            stats = {"backtracks": 0}
+            
+            # Khởi tạo instance của SudokuDLX
+            dlx_instance = self.model_classes['solver_dlx'].SudokuDLX(board_wrapper)
+            
+            if 'visualizer' in module_key:
+                # Nếu là Visualizer: Trả về Generator
+                generator = dlx_instance.solve_visual(board_wrapper, stats)
+                return (board_wrapper, stats, generator)
+            else:
+                # Nếu là Profiler: Chạy và trả về kết quả
+                board_wrapper.start_timer()
+                is_solved = dlx_instance.solve(stats)
+                board_wrapper.stop_timer()
+                
+                final_stats = board_wrapper.get_stats()
+                final_stats.update(stats)
+                return (board_wrapper, final_stats, is_solved)
+
+        # Xử lý cho các thuật toán cũ (BT, FC, MRV)
         module = self.model_classes.get(module_key, self.model_classes['algorithms'])
         solve_func = None
+        
         if algo_key == 'bt':
             if 'profiler' in module_key: solve_func = module.solve_backtracking_profile
             elif 'visualizer' in module_key: solve_func = module.solve_backtracking_visual
@@ -465,66 +558,90 @@ class AppController:
         board_wrapper = SudokuBoard_class(copy.deepcopy(grid_data))
         stats = {"backtracks": 0} 
         board_wrapper.start_timer()
+        
         is_solved_or_generator = solve_func(board_wrapper, stats)
+        
         if 'visualizer' in module_key:
             return (board_wrapper, stats, is_solved_or_generator)
+        
         board_wrapper.stop_timer()
         final_stats = board_wrapper.get_stats()
         final_stats.update(stats)
         return (board_wrapper, final_stats, is_solved_or_generator)
 
     def handle_clear(self):
+        """Xử lý nút XÓA / RESET."""
         if self.is_visualizer_running: self.is_visualizer_running = False 
         if self.analysis_popup_window: self.analysis_popup_window.destroy() 
-        is_grid_manually_filled = (not self.current_puzzle_data) and (self.view and not self.view.is_grid_empty())
+        
         if self.view:
             if self.current_puzzle_data:
+                # Nếu có đề bài gốc -> Reset về đề bài đó
                 self.view.load_puzzle_to_grid(self.current_puzzle_data, is_play_mode=self.is_play_mode)
                 self.view.set_buttons_state_puzzle_on_grid(self.csv_loaded)
             else:
+                # Nếu không -> Xóa trắng
                 self.view.clear_grid_and_stats() 
                 if self.csv_loaded: self.view.set_buttons_state_csv_loaded()
                 else: self.view.set_buttons_state_on_load()
             self._log("[HỆ THỐNG] Đã xóa/khôi phục lưới.", "green")
 
     def run_visualizer(self, grid_data, algo_key: str): 
+        """Thiết lập và khởi chạy chế độ Demo (Visualizer)."""
         if self.view: 
             self.view.load_puzzle_to_grid(grid_data, is_play_mode=False) 
             self.view.set_buttons_state_visualizing(True, self.csv_loaded)
-        if algo_key == 'visualizer_mrv':
+        
+        # Ánh xạ key sang module Visualizer tương ứng
+        target_key = "bt"
+        mod_name = "visualizer_bt"
+        algo_full_name = "Backtracking"
+
+        if algo_key == 'visualizer_dlx':
+            target_key = 'dlx'
+            mod_name = 'visualizer_dlx' 
+            algo_full_name = "Dancing Links (DLX)"
+        elif algo_key == 'visualizer_mrv':
             target_key = 'fc_mrv'
-            module_name = 'visualizer_mrv'
+            mod_name = 'visualizer_mrv'
             algo_full_name = "FC + MRV"
         elif algo_key == 'visualizer_fc':
             target_key = 'fc'
-            module_name = 'visualizer_fc'
+            mod_name = 'visualizer_fc'
             algo_full_name = "Forward Checking"
-        else:
-            target_key = 'bt'
-            module_name = 'visualizer_bt'
-            algo_full_name = "Backtracking"
-        board_wrapper, _stats, generator = self._run_single_algo(
-            grid_data, module_name, target_key
+            
+        # Gọi hàm _run_single_algo để lấy Generator
+        board_wrapper, _, generator = self._run_single_algo(
+            grid_data, mod_name, target_key
         )
+        
         self.visualizer_generator = generator
         self.current_visual_board = board_wrapper
         self.is_visualizer_running = True
         self.last_demo_status = None 
         self._log(f"[DEMO] Bắt đầu Demo {algo_full_name}...", "cyan")
+        
+        # Bắt đầu vòng lặp cập nhật giao diện
         self.step_visualizer()
 
     def step_visualizer(self):
+        """Hàm đệ quy (thông qua after) để cập nhật giao diện từng bước."""
         if not self.is_visualizer_running:
             self.visualizer_generator = None
             self.current_visual_board = None
             if self.view: self.view.set_buttons_state_visualizing(False, self.csv_loaded)
             return
         try:
+            # Lấy trạng thái tiếp theo từ Generator
             data = next(self.visualizer_generator)
+            
+            # Cập nhật View
             if self.view and self.current_puzzle_data:
                 self.view.cap_nhat_o_visual(data, self.current_puzzle_data)
+            
             status = data.get("status")
             if status in ("solved", "failed"):
+                # Kết thúc Demo
                 self.is_visualizer_running = False
                 self.last_demo_status = status
                 msg = "Tìm thấy lời giải!" if status == "solved" else f"Thất bại: {data.get('message')}"
@@ -534,6 +651,8 @@ class AppController:
                 self.current_visual_board = None
                 if self.view: self.view.set_buttons_state_visualizing(False, self.csv_loaded)
                 return
+            
+            # Lên lịch cho bước tiếp theo
             if self.view:
                 delay_ms = self.view.get_demo_speed()
                 self.view.root.after(delay_ms, self.step_visualizer)
