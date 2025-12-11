@@ -1,10 +1,11 @@
 from .sudoku_board import SudokuBoard
+import random
 
 def solve_forward_checking_mrv_visual(board_wrapper: SudokuBoard, stats: dict):
     try:
         domains = _initialize_domains(board_wrapper)
     except ValueError:
-        yield {"status": "failed", "message": "Đề bài gốc không hợp lệ"}
+        yield {"status": "failed", "message": "Đề bài gốc không hợp lệ", "stats": stats}
         return False 
 
     yield from _solve_fc_recursive_mrv_visual(board_wrapper, stats, domains)
@@ -44,11 +45,26 @@ def _prune_domains_on_setup(domains, r, c, num, board_wrapper):
                 return False 
     return True
 
+def _count_unassigned_neighbors(board, n, box_size, r, c):
+    degree = 0
+    for col in range(n):
+        if col != c and board[r][col] == 0: degree += 1
+    for row in range(n):
+        if row != r and board[row][c] == 0: degree += 1
+    box_r = (r // box_size) * box_size
+    box_c = (c // box_size) * box_size
+    for br in range(box_r, box_r + box_size):
+        for bc in range(box_c, box_c + box_size):
+            if (br, bc) != (r, c) and board[br][bc] == 0:
+                degree += 1
+    return degree
+
 def _find_cell_with_mrv(board_wrapper: SudokuBoard, domains: list):
     min_len = board_wrapper.n + 1 
-    best_cell = None
+    candidates = [] 
     board = board_wrapper.get_board()
     n = board_wrapper.n
+    box_size = board_wrapper.box_size
     
     for r in range(n):
         for c in range(n):
@@ -58,17 +74,28 @@ def _find_cell_with_mrv(board_wrapper: SudokuBoard, domains: list):
                 
                 if current_len < min_len:
                     min_len = current_len
-                    best_cell = (r, c)
-                    if min_len == 1: return best_cell
-    return best_cell
+                    candidates = [(r, c)] 
+                elif current_len == min_len:
+                    candidates.append((r, c)) 
+    
+    if not candidates: return None
+    if len(candidates) == 1: return candidates[0]
+    
+    best_candidate = candidates[0]
+    max_degree = -1
+    for (r, c) in candidates:
+        deg = _count_unassigned_neighbors(board, n, box_size, r, c)
+        if deg > max_degree:
+            max_degree = deg
+            best_candidate = (r, c)
+    return best_candidate
 
 def _solve_fc_recursive_mrv_visual(board_wrapper: SudokuBoard, stats: dict, domains: list):
-    # Chọn ô bằng MRV
     empty_cell = _find_cell_with_mrv(board_wrapper, domains)
 
     if not empty_cell:
         if board_wrapper.find_empty_cell() is None:
-            yield {"status": "solved"}
+            yield {"status": "solved", "stats": stats}
             return True
         else:
             return False 
@@ -79,37 +106,23 @@ def _solve_fc_recursive_mrv_visual(board_wrapper: SudokuBoard, stats: dict, doma
     for num in domain_to_try:
         board_wrapper.set_cell(row, col, num)
         
-        # Báo hiệu thử giá trị
-        yield {
-            "action": "try",
-            "cell": (row, col),
-            "num": num,
-            "status": "running"
-        }
+        yield {"action": "try", "cell": (row, col), "num": num, "status": "running", "stats": stats}
 
-        # Báo hiệu cắt tỉa (Lấy neighbors_list)
-        is_consistent, pruned_log, neighbors_list = yield from _prune_neighbors_visual(domains, row, col, num, board_wrapper)
+        is_consistent, pruned_log = yield from _prune_neighbors_visual(domains, row, col, num, board_wrapper, stats)
         
         if is_consistent:
             result = yield from _solve_fc_recursive_mrv_visual(board_wrapper, stats, domains)
-            if result:
-                return True 
+            if result: return True 
 
-        # Quay lui
         stats["backtracks"] = stats.get("backtracks", 0) + 1
-        yield from _restore_neighbors_visual(domains, pruned_log, neighbors_list)
+        yield from _restore_neighbors_visual(domains, pruned_log, stats)
         board_wrapper.set_cell(row, col, 0)
         
-        yield {
-            "action": "backtrack",
-            "cell": (row, col),
-            "stats": stats, 
-            "status": "running"
-        }
+        yield {"action": "backtrack", "cell": (row, col), "stats": stats, "status": "running"}
     
     return False 
 
-def _prune_neighbors_visual(domains, r, c, num, board_wrapper):
+def _prune_neighbors_visual(domains, r, c, num, board_wrapper, stats):
     pruned_log = [] 
     n = board_wrapper.n
     box_size = board_wrapper.box_size
@@ -123,20 +136,18 @@ def _prune_neighbors_visual(domains, r, c, num, board_wrapper):
             neighbors.add((br, bc))
     neighbors.discard((r, c)) 
     
-    neighbors_list = list(neighbors)
-
-    yield {"action": "prune_start", "neighbors": neighbors_list, "status": "running"}
+    yield {"action": "prune_start", "neighbors": list(neighbors), "status": "running", "stats": stats}
 
     for (nr, nc) in neighbors:
         if num in domains[nr][nc]:
             domains[nr][nc].remove(num)
             pruned_log.append((nr, nc, num))
             if not domains[nr][nc]:
-                yield {"action": "prune_fail", "cell": (nr, nc), "status": "running"}
-                return (False, pruned_log, neighbors_list)
-    return (True, pruned_log, neighbors_list)
+                yield {"action": "prune_fail", "cell": (nr, nc), "status": "running", "stats": stats}
+                return (False, pruned_log)
+    return (True, pruned_log)
 
-def _restore_neighbors_visual(domains, pruned_log, neighbors_list):
-    yield {"action": "restore_start", "neighbors": neighbors_list, "status": "running"}
+def _restore_neighbors_visual(domains, pruned_log, stats):
+    yield {"action": "restore_start", "neighbors": [], "status": "running", "stats": stats}
     for (r, c, num) in pruned_log:
         domains[r][c].add(num)

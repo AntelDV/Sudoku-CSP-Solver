@@ -1,27 +1,20 @@
 from .sudoku_board import SudokuBoard
 
-
 class DLXNode:
     """
     Đại diện cho một nút (số 1) trong ma trận thưa.
     Sử dụng danh sách liên kết đôi 4 chiều (Toroidal Doubly Linked List).
     """
     def __init__(self):
-        # 4 con trỏ hướng về 4 phía: Trái, Phải, Trên, Dưới
         self.left = self
         self.right = self
         self.up = self
         self.down = self
         
-        # Trỏ về Header của cột chứa node này (để biết node thuộc ràng buộc nào)
         self.column = None 
-        
-        # Lưu dữ liệu bài toán thực tế: (hàng, cột, giá trị) của Sudoku
-        # Giúp tái tạo lại bàn cờ khi tìm ra lời giải.
         self.row_data = None 
 
 class DLXHeader(DLXNode):
-
     def __init__(self, name=""):
         super().__init__()
         self.size = 0      
@@ -39,23 +32,21 @@ class SudokuDLX:
         self.box_size = board_wrapper.box_size
         self.original_board = board_wrapper.get_board()
         
-        # Node gốc (Root) của toàn bộ cấu trúc dữ liệu
+
         self.head = DLXHeader("ROOT")
         
-        self.solution = []   
+        self.solution = []     
         self.nodes_visited = 0  
-        self.columns_list = [] 
+        self.columns_list = []  
 
-    
+
     def solve(self, stats: dict):
-        """
-        Chạy thuật toán Algorithm X ở tốc độ cao nhất (không có delay/yield).
-        """
+
         # Biến đổi Sudoku thành bài toán Exact Cover (Ma trận 0-1)
         self._build_exact_cover_matrix()
         
         # Xử lý các số đề bài đã cho (Pre-cover)
-        # Giúp giảm không gian tìm kiếm ngay từ đầu.
+        # Giúp giảm không gian tìm kiếm ngay từ đầu bằng cách loại bỏ các phương án mâu thuẫn.
         self._initialize_clues()
         
         # Đệ quy tìm lời giải
@@ -71,22 +62,25 @@ class SudokuDLX:
                 for c in range(self.n):
                     self.wrapper.set_cell(r, c, result_board[r][c])
             
+            # Ghi nhận thống kê
             stats["nodes_visited"] = self.nodes_visited
             return True
         
         return False
 
-   
+
     def solve_visual(self, wrapper, stats: dict):
+        """
+        Generator trả về từng bước chạy để vẽ lên giao diện.
+        """
         self._build_exact_cover_matrix()
-        self._initialize_clues() # Che các ô đề bài để không bị tô màu nhầm
+        self._initialize_clues() 
         
-        # Gọi hàm đệ quy có yield
         yield from self._search_visual_generator(stats)
 
 
     def _initialize_clues(self):
-
+       
         for r in range(self.n):
             for c in range(self.n):
                 val = self.original_board[r][c]
@@ -119,15 +113,15 @@ class SudokuDLX:
                         # Lưu vào lời giải (để sau này tái tạo nếu cần)
                         self.solution.append(target_row)
 
-
+  
     def _search(self, visualize=False):
-        # Nếu Header trỏ về chính nó -> Hết cột -> Ma trận rỗng -> Đã phủ kín -> THÀNH CÔNG
+        # ĐK Dừng: Nếu Header trỏ về chính nó -> Hết cột -> Ma trận rỗng -> Đã phủ kín -> THÀNH CÔNG
         if self.head.right == self.head:
             return True
         
         self.nodes_visited += 1
         
-        # Chọn cột tốt nhất (Heuristic: Cột có ít số 1 nhất -> Dễ fail nhất)
+        # Chọn cột tốt nhất (Heuristic: Cột có kích thước nhỏ nhất -> Dễ fail nhất)
         col = self._choose_column()
         
         # Cover cột này (Xóa cột và các hàng liên quan khỏi ma trận)
@@ -165,10 +159,12 @@ class SudokuDLX:
         return False
 
     def _search_visual_generator(self, stats):
-        """Phiên bản có yield để cập nhật giao diện."""
         if self.head.right == self.head:
             yield {"status": "solved", "stats": stats}
             return True
+
+        self.nodes_visited += 1
+        stats["nodes_visited"] = self.nodes_visited 
 
         col = self._choose_column()
         self._cover(col)
@@ -178,12 +174,13 @@ class SudokuDLX:
             self.solution.append(curr_row)
             r, c, val = curr_row.row_data
             
-            #  Chỉ báo hiệu nếu là ô trống (để tránh tô xanh ô đề bài)
+            # Chỉ báo hiệu nếu là ô trống (để tránh tô xanh ô đề bài)
             if self.original_board[r][c] == 0:
                 self.wrapper.set_cell(r, c, val)
                 yield {
                     "action": "try", 
                     "cell": (r, c), "num": val, 
+                    "stats": stats, 
                     "status": "running"
                 }
 
@@ -219,9 +216,10 @@ class SudokuDLX:
         self._uncover(col)
         return False
 
-
+ 
     def _cover(self, col):
-        # Gỡ cột ra khỏi danh sách Header ngang
+
+        #  Gỡ cột ra khỏi danh sách Header ngang
         col.right.left = col.left
         col.left.right = col.right
         
@@ -238,6 +236,7 @@ class SudokuDLX:
             i = i.down
 
     def _uncover(self, col):
+
         i = col.up
         while i != col:
             j = i.left
@@ -265,11 +264,8 @@ class SudokuDLX:
             curr = curr.right
         return best_col
 
-
     def _build_exact_cover_matrix(self):
-        """
-        Chuyển bài toán Sudoku N x N thành ma trận Exact Cover.
-        """
+ 
         # Reset lại cấu trúc
         self.head = DLXHeader("ROOT")
         self.columns_list = []
@@ -293,9 +289,9 @@ class SudokuDLX:
             col.right = self.head
             self.head.left = col
             prev = col
-            self.columns_list.append(col) # Lưu lại để truy cập O(1)
+            self.columns_list.append(col) 
 
-        # --- TẠO HÀNG  ---
+        # --- TẠO HÀNG ---
         # Mỗi nước đi "Điền số v vào ô (r,c)" tạo thành 1 hàng trong ma trận.
         # Hàng này sẽ có số 1 tại 4 cột ràng buộc tương ứng.
         
@@ -345,14 +341,14 @@ class SudokuDLX:
             new_node.column = col_header
             new_node.row_data = (r, c, val) 
             
-            #  Link Dọc (Vào cột)
-            new_node.down = col_header      
+            # Link Dọc (Vào cột)
+            new_node.down = col_header     
             new_node.up = col_header.up     
             col_header.up.down = new_node  
             col_header.up = new_node        
-            col_header.size += 1           
+            col_header.size += 1          
             
-            # Link Ngang (
+            # Link Ngang (Tạo thành hàng)
             if start_node is None:
                 start_node = new_node
                 start_node.left = new_node

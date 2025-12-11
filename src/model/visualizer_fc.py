@@ -1,13 +1,10 @@
 from .sudoku_board import SudokuBoard
 
 def solve_forward_checking_visual(board_wrapper: SudokuBoard, stats: dict):
-    """
-    Generator Visualizer cho Forward Checking.
-    """
     try:
         domains = _initialize_domains(board_wrapper)
     except ValueError:
-        yield {"status": "failed", "message": "Đề bài gốc không hợp lệ"}
+        yield {"status": "failed", "message": "Đề bài gốc không hợp lệ", "stats": stats}
         return False 
 
     yield from _solve_fc_recursive_visual(board_wrapper, stats, domains)
@@ -50,7 +47,7 @@ def _prune_domains_on_setup(domains, r, c, num, board_wrapper):
 def _solve_fc_recursive_visual(board_wrapper: SudokuBoard, stats: dict, domains: list):
     empty_cell = board_wrapper.find_empty_cell()
     if not empty_cell:
-        yield {"status": "solved"}
+        yield {"status": "solved", "stats": stats}
         return True  
 
     row, col = empty_cell
@@ -59,31 +56,24 @@ def _solve_fc_recursive_visual(board_wrapper: SudokuBoard, stats: dict, domains:
     for num in domain_to_try:
         board_wrapper.set_cell(row, col, num)
         
-        # Báo hiệu: Đang thử điền
-        yield {"action": "try", "cell": (row, col), "num": num, "status": "running"}
+        yield {"action": "try", "cell": (row, col), "num": num, "status": "running", "stats": stats}
 
-        # Thực hiện Cắt tỉa - Lấy về cả neighbors để sau này restore màu
-        is_consistent, pruned_log, neighbors_list = yield from _prune_neighbors_visual(domains, row, col, num, board_wrapper)
+        is_consistent, pruned_log, neighbors_list = yield from _prune_neighbors_visual(domains, row, col, num, board_wrapper, stats)
         
         if is_consistent:
             result = yield from _solve_fc_recursive_visual(board_wrapper, stats, domains)
             if result: return True 
 
-        # Quay lui
         stats["backtracks"] = stats.get("backtracks", 0) + 1
         
-        # Báo hiệu Khôi phục (Truyền neighbors_list để dọn màu xanh)
-        yield from _restore_neighbors_visual(domains, pruned_log, neighbors_list)
+        yield from _restore_neighbors_visual(domains, pruned_log, neighbors_list, stats)
         
         board_wrapper.set_cell(row, col, 0)
         yield {"action": "backtrack", "cell": (row, col), "stats": stats, "status": "running"}
     
     return False 
 
-def _prune_neighbors_visual(domains, r, c, num, board_wrapper):
-    """
-    Generator cắt tỉa: Gửi thông báo 'prune_start' để UI tô viền xanh các ô liên quan.
-    """
+def _prune_neighbors_visual(domains, r, c, num, board_wrapper, stats):
     pruned_log = [] 
     n = board_wrapper.n
     box_size = board_wrapper.box_size
@@ -99,24 +89,18 @@ def _prune_neighbors_visual(domains, r, c, num, board_wrapper):
     
     neighbors_list = list(neighbors)
 
-    # Báo hiệu bắt đầu cắt tỉa (Tô xanh)
-    yield {"action": "prune_start", "neighbors": neighbors_list, "status": "running"}
+    yield {"action": "prune_start", "neighbors": neighbors_list, "status": "running", "stats": stats}
 
     for (nr, nc) in neighbors:
         if num in domains[nr][nc]:
             domains[nr][nc].remove(num)
             pruned_log.append((nr, nc, num))
             if not domains[nr][nc]:
-                # Nếu cắt tỉa thất bại -> Báo hiệu tô đỏ
-                yield {"action": "prune_fail", "cell": (nr, nc), "status": "running"}
+                yield {"action": "prune_fail", "cell": (nr, nc), "status": "running", "stats": stats}
                 return (False, pruned_log, neighbors_list)
     return (True, pruned_log, neighbors_list)
 
-def _restore_neighbors_visual(domains, pruned_log, neighbors_list):
-    """
-    Generator khôi phục: Gửi thông báo 'restore_start' để UI xóa màu xanh.
-    """
-    yield {"action": "restore_start", "neighbors": neighbors_list, "status": "running"}
-    
+def _restore_neighbors_visual(domains, pruned_log, neighbors_list, stats):
+    yield {"action": "restore_start", "neighbors": neighbors_list, "status": "running", "stats": stats}
     for (r, c, num) in pruned_log:
         domains[r][c].add(num)
