@@ -2,28 +2,31 @@
 import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk
-import math  
+import math
 from typing import TYPE_CHECKING
-
 from src.utils.sudoku_converter import SudokuConverter
 
 if TYPE_CHECKING:
     from src.controller.app_controller import AppController
 
-# --- CẤU HÌNH MÀU SẮC GIAO DIỆN ---
+# --- CẤU HÌNH MÀU SẮC ---
 MAU_O_BINH_THUONG = ("#FFFFFF", "#FFFFFF") 
-MAU_O_GOC_FG = ("#D0D0D0", "#D0D0D0")       
+MAU_O_GOC_FG = ("#D0D0D0", "#D0D0D0")      
 MAU_O_GOC_TEXT = ("#000000", "#000000") 
 MAU_O_GIAI_TEXT = ("#000000", "#000000") 
 MAU_VIEN_LUOI = ("#000000", "#000000") 
-MAU_O_LOI = "#E74C3C"                       
+MAU_O_LOI = "#E74C3C" 
 
-MAU_NEN_THU = "#28a745"      
+MAU_GOI_Y = "#FFC107"
+MAU_CHU_GOI_Y = "#000000"
+
+# Màu Demo
+MAU_NEN_THU = "#28a745"       
 MAU_CHU_THU = "#FFFFFF"       
-MAU_NEN_QUAY_LUI = "#E74C3C"  
+MAU_NEN_QUAY_LUI = "#E74C3C" 
 MAU_CHU_QUAY_LUI = "#FFFFFF"  
 MAU_VIEN_HANG_XOM = "#0052cc" 
-MAU_VIEN_KHOI_PHUC = "#6a7075"
+MAU_VIEN_KHOI_PHUC = "#6a7075" 
 
 class MainView(ctk.CTkFrame):
  
@@ -32,15 +35,15 @@ class MainView(ctk.CTkFrame):
         self.root = root
         self.controller = controller
         
-        # Dữ liệu lưới và trạng thái
-        self.cac_o_nhap = {}    
-        self.current_n = 9      
+        # Dữ liệu lưới
+        self.cac_o_nhap = {} 
+        self.current_n = 9 
         
-        # Biến trạng thái UI
+        # Biến trạng thái
         self.algo_var = ctk.StringVar() 
         self.mode_var = ctk.StringVar(value="🤖 Máy Giải") 
         
-        # Các thành phần giao diện (Widgets)
+        # Widgets
         self.lbl_puzzle_info = None
         self.switch_demo_mode = None
         self.slider_demo_speed = None
@@ -48,12 +51,11 @@ class MainView(ctk.CTkFrame):
         self.combo_mode = None 
         self.combo_size = None
         self.combo_fast_solve = None 
-        self.btn_check = None 
-        self.frame_numpad = None  
+        self.frame_numpad = None 
         self.sep_1 = None
         self.sep_2 = None
 
-        # Các nút bấm chức năng
+        # Buttons
         self.btn_load_file = None
         self.btn_csv_easy = None
         self.btn_csv_medium = None
@@ -64,35 +66,32 @@ class MainView(ctk.CTkFrame):
         self.btn_sosanh = None
         self.btn_xoa = None
         
+        #  Nút Gợi ý
+        self.btn_hint = None
+        self.btn_check = None 
+        
         self.khung_ket_qua_nhanh = None
         self.lbl_fast_solve_time = None
         self.lbl_fast_solve_backtracks = None
         
-        # Đăng ký hàm validate nhập liệu
         self.vcmd = (self.root.register(self.kiem_tra_nhap_lieu), '%P')
         
-        # Bắt đầu dựng giao diện
         self.khoi_tao_giao_dien()
 
     def kiem_tra_nhap_lieu(self, gia_tri_moi):
-        """Hàm callback kiểm tra tính hợp lệ khi gõ phím."""
-        #  Dùng Converter để cho phép cả số và chữ cái
         return SudokuConverter.is_valid_input(gia_tri_moi)
 
     def khoi_tao_giao_dien(self):
-        # Cấu hình lưới layout chính
         self.grid_columnconfigure(0, weight=1, minsize=800) 
-        self.grid_columnconfigure(1, minsize=350)          
+        self.grid_columnconfigure(1, minsize=350)
         self.grid_rowconfigure(0, weight=1)
         
-        # ---  Khung Lưới (Bên trái) ---
+        # Khung Lưới
         self.khung_luoi_container = ctk.CTkFrame(self, fg_color="transparent")
         self.khung_luoi_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        
-        # Vẽ lưới mặc định ban đầu (9x9)
         self.rebuild_grid(9)
         
-        # --- Khung Điều khiển (Bên phải) ---
+        # Khung Điều khiển
         khung_dieu_khien = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
         khung_dieu_khien.grid(row=0, column=1, sticky="nsew")
 
@@ -102,20 +101,15 @@ class MainView(ctk.CTkFrame):
         self.tao_khung_dieu_khien(khung_controls_inner)
 
     def rebuild_grid(self, n):
-        """Vẽ lại toàn bộ lưới Sudoku dựa trên kích thước N."""
         self.current_n = n
-        
-        # Xóa các ô cũ
         for widget in self.khung_luoi_container.winfo_children():
             widget.destroy()
             
-        # Tính toán kích thước ô sao cho vừa khung hình
         max_width = 800 
         max_height = 800
         cell_size = min(max_width // n, max_height // n)
-        if cell_size < 22: cell_size = 22 # Kích thước tối thiểu
+        if cell_size < 22: cell_size = 22 
         
-        # Điều chỉnh font chữ theo kích thước
         if n >= 25:   font_size = int(cell_size * 0.45) 
         elif n >= 16: font_size = int(cell_size * 0.5)
         else:         font_size = int(cell_size * 0.6)
@@ -129,7 +123,6 @@ class MainView(ctk.CTkFrame):
         block_pad = 1 if n > 16 else 2
         cell_pad = 0 if n >= 16 else 1 
         
-        # Vẽ các khối (Box) và các ô (Cell)
         for box_r in range(box_size):
             for box_c in range(box_size):
                 frame_box = ctk.CTkFrame(khung_center, fg_color="black", corner_radius=0, border_width=0)
@@ -150,15 +143,13 @@ class MainView(ctk.CTkFrame):
                         entry.grid(row=cell_r, column=cell_c, padx=cell_pad, pady=cell_pad)
                         self.cac_o_nhap[(global_r, global_c)] = entry
                         
-                        # Binding sự kiện nhập liệu và focus
                         entry.bind("<KeyRelease>", lambda e, r=global_r, c=global_c: self.controller.handle_grid_modified(e, r, c))
                         entry.bind("<FocusIn>", lambda e, r=global_r, c=global_c: self.controller.handle_cell_focus(r, c))
 
-        #  Sau khi vẽ lưới xong, vẽ lại Bàn phím số tương ứng
         self.rebuild_numpad(n)
 
     def tao_khung_dieu_khien(self, parent):
-        #  Tiêu đề
+        # Tiêu đề
         khung_tieu_de = ctk.CTkFrame(parent, fg_color="transparent")
         khung_tieu_de.pack(fill="x", pady=(5, 5))
         ctk.CTkLabel(
@@ -166,7 +157,7 @@ class MainView(ctk.CTkFrame):
             font=ctk.CTkFont(size=36, weight="bold"), text_color="#38bdf8"
         ).pack(expand=True)
         
-        # Chọn Size
+        #  Chọn Size
         khung_size = ctk.CTkFrame(parent, fg_color="transparent")
         khung_size.pack(fill="x", pady=2)
         ctk.CTkLabel(khung_size, text="Kích thước:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=5)
@@ -179,25 +170,20 @@ class MainView(ctk.CTkFrame):
 
         #  Nạp đề
         self.tao_khung_nap_de(parent)
-        
         self.sep_1 = ctk.CTkFrame(parent, height=2, fg_color="#334155")
         self.sep_1.pack(fill="x", padx=0, pady=5)
 
-        #  Chọn chế độ (Máy/Người)
+        # Chọn chế độ
         self.tao_khung_che_do(parent) 
         
-        #  Các nút hành động chính (Giải/So sánh/Check)
+        #  Hành động
         self.tao_khung_hanh_dong(parent)
-        
         self.sep_2 = ctk.CTkFrame(parent, height=2, fg_color="#334155")
         self.sep_2.pack(fill="x", padx=0, pady=5)
 
-        #  Demo Tools và Bàn phím
+        #  Demo Tools & Numpad
         self.tao_khung_che_do_demo(parent)
-        
-        # Khởi tạo khung chứa numpad nhưng chưa vẽ nội dung vội
         self.frame_numpad = ctk.CTkFrame(parent, fg_color="transparent")
-        # Gọi hàm vẽ lần đầu tiên để khớp với size mặc định
         self.rebuild_numpad(self.current_n)
         
         self.set_controller_references()
@@ -205,37 +191,19 @@ class MainView(ctk.CTkFrame):
         self.set_buttons_state_on_load()
 
     def rebuild_numpad(self, n):
-        """
-        Hàm vẽ lại bàn phím số (Dynamic Numpad).
-        Tự động tính toán số hàng/cột và sinh phím số/chữ cái.
-        """
-        # Kiểm tra an toàn: Nếu khung chưa được tạo thì thoát (tránh lỗi khi gọi từ rebuild_grid quá sớm)
-        if self.frame_numpad is None:
-            return 
+        if self.frame_numpad is None: return 
+        for widget in self.frame_numpad.winfo_children(): widget.destroy()
 
-        # Xóa các nút cũ
-        for widget in self.frame_numpad.winfo_children():
-            widget.destroy()
-
-        # Tiêu đề bàn phím
         label = ctk.CTkLabel(self.frame_numpad, text=f"Bàn phím nhập ({n} giá trị):", font=ctk.CTkFont(size=13, weight="bold"))
         label.pack(pady=(0, 5))
-        
         grid_frame = ctk.CTkFrame(self.frame_numpad, fg_color="transparent")
         grid_frame.pack()
         
-        # Tính toán lưới bàn phím: căn bậc 2 của N (vd: 16 -> 4 cột)
         cols = int(math.isqrt(n))
-        
-        # Vòng lặp tạo từng nút
         for val in range(1, n + 1):
-            # Tính tọa độ grid
             row = (val - 1) // cols
             col = (val - 1) % cols
-            
-            #  Lấy ký tự hiển thị từ Converter (1->1, 10->A)
             display_text = SudokuConverter.int_to_char(val)
-            
             btn = ctk.CTkButton(
                 grid_frame, text=display_text, width=45, height=35,
                 font=ctk.CTkFont(size=14, weight="bold"),
@@ -243,7 +211,6 @@ class MainView(ctk.CTkFrame):
             )
             btn.grid(row=row, column=col, padx=2, pady=2)
             
-        # Nút Xóa (Clear) nằm riêng bên dưới
         btn_clear = ctk.CTkButton(
             self.frame_numpad, text="⌫ Xóa Ô", width=120, height=30,
             font=ctk.CTkFont(size=12, weight="bold"),
@@ -252,7 +219,6 @@ class MainView(ctk.CTkFrame):
         )
         btn_clear.pack(pady=(10, 0))
 
-    # --- CÁC HÀM CẤU HÌNH KHUNG CON  ---
     def on_size_change(self, choice):
         self.controller.handle_size_change(choice)
 
@@ -267,7 +233,6 @@ class MainView(ctk.CTkFrame):
         khung_kho = ctk.CTkFrame(khung_nap, fg_color="transparent")
         khung_kho.pack(pady=2)
         khung_kho.grid_columnconfigure((0, 1), weight=1)
-        # Các nút lấy đề
         self.btn_csv_easy = ctk.CTkButton(khung_kho, text="Lấy Đề Dễ", font=ctk.CTkFont(size=12, weight="bold"), fg_color="#28a745", hover_color="#32CD32", width=130)
         self.btn_csv_easy.grid(row=0, column=0, padx=2, pady=2)
         self.btn_csv_medium = ctk.CTkButton(khung_kho, text="Lấy Đề TB", font=ctk.CTkFont(size=12, weight="bold"), fg_color="#FFC107", hover_color="#FFD700", text_color="black", width=130)
@@ -292,7 +257,6 @@ class MainView(ctk.CTkFrame):
         is_play = (choice == "👤 Người Chơi")
         
         if is_play:
-            # Ẩn các thành phần Máy giải
             self.switch_demo_mode.pack_forget() 
             self.slider_demo_speed.pack_forget()
             self.lbl_demo_stats.pack_forget()
@@ -301,16 +265,15 @@ class MainView(ctk.CTkFrame):
             self.btn_sosanh.grid_remove()
             self.combo_fast_solve.pack_forget()
             
-            # Hiện thành phần Người chơi
-            self.btn_check.pack(pady=5)
+            self.btn_check.pack(pady=(5, 2))
+            self.btn_hint.pack(pady=(2, 5))
+            
             self.btn_xoa.configure(text="✕ LÀM LẠI")
             self.btn_check.configure(state="normal")
+            self.btn_hint.configure(state="normal")
             
-            #  Hiện khung numpad động
-            if self.frame_numpad:
-                self.frame_numpad.pack(fill="x", pady=5)
+            if self.frame_numpad: self.frame_numpad.pack(fill="x", pady=5)
         else:
-            # Hiện lại thành phần Máy giải
             self.switch_demo_mode.pack(pady=5, padx=10, anchor="w")
             if self.switch_demo_mode.get():
                 self.slider_demo_speed.pack(pady=(5, 5))
@@ -320,12 +283,12 @@ class MainView(ctk.CTkFrame):
             self.btn_sosanh.grid()
             self.combo_fast_solve.pack(pady=(5, 5))
             
+            # Ẩn nút người chơi
             self.btn_check.pack_forget()
-            self.btn_xoa.configure(text="✕ XÓA")
+            self.btn_hint.pack_forget()
             
-            #  Ẩn numpad khi ở chế độ máy giải
-            if self.frame_numpad:
-                self.frame_numpad.pack_forget()
+            self.btn_xoa.configure(text="✕ XÓA")
+            if self.frame_numpad: self.frame_numpad.pack_forget()
             
             self.set_buttons_state_puzzle_on_grid(self.controller.csv_loaded)
 
@@ -353,6 +316,14 @@ class MainView(ctk.CTkFrame):
         
         self.btn_check = ctk.CTkButton(khung_hanh_dong, text="✅ KIỂM TRA", font=ctk.CTkFont(size=14, weight="bold"), fg_color="#17a2b8", hover_color="#138496", width=200, height=35)
         self.btn_check.pack_forget()
+
+        self.btn_hint = ctk.CTkButton(
+            khung_hanh_dong, text="💡 GỢI Ý THÔNG MINH", 
+            font=ctk.CTkFont(size=14, weight="bold"), 
+            fg_color="#F59E0B", hover_color="#D97706", text_color="#000000",
+            width=200, height=35
+        )
+        self.btn_hint.pack_forget()
 
         self.khung_ket_qua_nhanh = ctk.CTkFrame(khung_hanh_dong, fg_color="transparent")
         self.lbl_fast_solve_time = ctk.CTkLabel(self.khung_ket_qua_nhanh, text="Thời gian: 0.00s", font=ctk.CTkFont(size=13, weight="bold"), text_color="#3498DB")
@@ -404,6 +375,7 @@ class MainView(ctk.CTkFrame):
         self.btn_sosanh.configure(command=self.controller.handle_compare)
         self.btn_xoa.configure(command=self.controller.handle_clear)
         self.btn_check.configure(command=self.controller.handle_check_solution)
+        self.btn_hint.configure(command=self.controller.handle_hint)
 
     def get_selected_algorithm(self) -> (str, bool):
         selected = self.algo_var.get()
@@ -425,27 +397,20 @@ class MainView(ctk.CTkFrame):
     def update_puzzle_info(self, text: str):
         self.lbl_puzzle_info.configure(text=text)
 
-    # --- CÁC HÀM TƯƠNG TÁC LƯỚI  ---
     def load_puzzle_to_grid(self, grid_data, is_play_mode=False):
         n = len(grid_data)
-        if n != self.current_n:
-            self.rebuild_grid(n)
+        if n != self.current_n: self.rebuild_grid(n)
         self.clear_fast_solve_stats() 
-        
-        # Reset toàn bộ
         for r in range(n):
             for c in range(n):
                 o_nhap_lieu = self.cac_o_nhap[(r, c)]
                 o_nhap_lieu.configure(state='normal', fg_color=MAU_O_BINH_THUONG[0], text_color=MAU_O_GIAI_TEXT[0], border_width=1, border_color = MAU_VIEN_LUOI[0]) 
                 o_nhap_lieu.delete(0, "end")
-        
-        # Điền dữ liệu
         for r in range(n):
             for c in range(n):
                 o_nhap_lieu = self.cac_o_nhap[(r, c)]
                 val = grid_data[r][c]
                 if val != 0:
-                    #  Chuyển đổi Số -> Chữ (10->A)
                     val_display = SudokuConverter.int_to_char(val)
                     o_nhap_lieu.insert(0, str(val_display))
                     o_nhap_lieu.configure(state='disabled', fg_color=MAU_O_GOC_FG[0], text_color=MAU_O_GOC_TEXT[0]) 
@@ -460,7 +425,6 @@ class MainView(ctk.CTkFrame):
                 val_goc = puzzle_data[r][c]
                 val_giai = solution_data[r][c]
                 o_nhap_lieu.delete(0, "end")
-                #  Chuyển đổi Số -> Chữ
                 o_nhap_lieu.insert(0, SudokuConverter.int_to_char(val_giai))
                 if val_goc != 0:
                     o_nhap_lieu.configure(state='disabled', fg_color=MAU_O_GOC_FG[0], text_color=MAU_O_GOC_TEXT[0], border_width=1, border_color = MAU_VIEN_LUOI[0]) 
@@ -479,7 +443,6 @@ class MainView(ctk.CTkFrame):
         if self.lbl_demo_stats: self.lbl_demo_stats.configure(text="Số bước lui: 0")
 
     def get_grid_data(self):
-        """Lấy dữ liệu từ lưới về dạng ma trận số nguyên."""
         grid_data = []
         for r in range(self.current_n):
             row_data = []
@@ -489,7 +452,6 @@ class MainView(ctk.CTkFrame):
                 if val_str == "": 
                     row_data.append(0)
                 else:
-                    #  Chuyển đổi Chữ -> Số (A->10)
                     num = SudokuConverter.char_to_int(val_str)
                     if num > 0:
                         row_data.append(num)
@@ -516,6 +478,11 @@ class MainView(ctk.CTkFrame):
             else:
                 o_nhap_lieu.configure(fg_color=MAU_O_BINH_THUONG[0], text_color=MAU_O_GIAI_TEXT[0])
 
+    def highlight_hint_cell(self, r, c):
+        o_nhap_lieu = self.cac_o_nhap[(r, c)]
+        o_nhap_lieu.configure(fg_color=MAU_GOI_Y, text_color=MAU_CHU_GOI_Y)
+        o_nhap_lieu.focus_set()
+
     def set_cell_validity(self, r, c, is_valid: bool):
         o_nhap_lieu = self.cac_o_nhap[(r, c)]
         if not is_valid:
@@ -534,6 +501,7 @@ class MainView(ctk.CTkFrame):
         self.btn_sosanh.configure(state="disabled")
         self.btn_xoa.configure(state="disabled")
         if self.btn_check: self.btn_check.configure(state="disabled")
+        if self.btn_hint: self.btn_hint.configure(state="disabled")
 
     def set_buttons_state_csv_loaded(self):
         self.btn_load_file.configure(state="normal")
@@ -545,9 +513,11 @@ class MainView(ctk.CTkFrame):
         self.btn_sosanh.configure(state="disabled")
         self.btn_xoa.configure(state="disabled")
         if self.btn_check: self.btn_check.configure(state="disabled")
+        if self.btn_hint: self.btn_hint.configure(state="disabled")
 
     def set_buttons_state_puzzle_on_grid(self, csv_loaded: bool):
         self.btn_load_file.configure(state="normal")
+        state_csv = "normal" if csv_loaded else "disabled"
         self.btn_csv_easy.configure(state="normal")
         self.btn_csv_medium.configure(state="normal")
         self.btn_csv_hard.configure(state="normal")
@@ -557,14 +527,18 @@ class MainView(ctk.CTkFrame):
             self.btn_giai.grid_remove()
             self.btn_sosanh.grid_remove()
             if self.btn_check: 
-                self.btn_check.pack(pady=5)
-                self.btn_check.configure(state="normal") 
+                self.btn_check.pack(pady=(5, 2))
+                self.btn_check.configure(state="normal")
+            if self.btn_hint:
+                self.btn_hint.pack(pady=(2, 5))
+                self.btn_hint.configure(state="normal")
         else:
             self.btn_giai.grid()
             self.btn_giai.configure(state="normal")
             self.btn_sosanh.grid()
             self.btn_sosanh.configure(state="normal")
             if self.btn_check: self.btn_check.pack_forget()
+            if self.btn_hint: self.btn_hint.pack_forget()
         self.btn_xoa.configure(state="normal")
 
     def set_buttons_state_visualizing(self, is_running: bool, csv_loaded: bool):
@@ -581,11 +555,10 @@ class MainView(ctk.CTkFrame):
             self.combo_mode.configure(state="disabled")
             self.combo_size.configure(state="disabled")
             if self.btn_check: self.btn_check.configure(state="disabled")
-            
+            if self.btn_hint: self.btn_hint.configure(state="disabled")
             for r in range(self.current_n):
                 for c in range(self.current_n):
                     self.cac_o_nhap[(r, c)].configure(state="disabled")
-            
             if is_demo_mode:
                 self.btn_giai.configure(text="❚❚ DỪNG DEMO", state="normal", fg_color="#E74C3C", hover_color="#EC7063")
             else:
@@ -595,14 +568,12 @@ class MainView(ctk.CTkFrame):
             self.switch_demo_mode.configure(state="normal")
             self.combo_mode.configure(state="normal")
             self.combo_size.configure(state="normal")
-            
             if self.controller.current_puzzle_data and self.controller.last_demo_status != "solved":
                 self.load_puzzle_to_grid(self.controller.current_puzzle_data, is_play_mode=(self.mode_var.get() == "👤 Người Chơi"))
             elif not self.controller.current_puzzle_data:
                 for r in range(self.current_n):
                     for c in range(self.current_n):
                         self.cac_o_nhap[(r, c)].configure(state="normal")
-            
             self.set_buttons_state_puzzle_on_grid(csv_loaded)
             self.toggle_demo_widgets() 
             self.btn_giai.configure(fg_color="#28a745", hover_color="#32CD32")
@@ -611,14 +582,12 @@ class MainView(ctk.CTkFrame):
         if not puzzle_data: return
         action = data.get("action")
         self.reset_all_cells_visual(puzzle_data)
-        
         if action == "try":
             r, c = data["cell"]
             num = data["num"]
             o = self.cac_o_nhap[(r, c)]
             o.configure(state="normal")
             o.delete(0, "end")
-            #  Hiển thị chữ cái trong quá trình chạy Demo
             o.insert(0, SudokuConverter.int_to_char(num))
             o.configure(state="disabled", fg_color=MAU_NEN_THU, text_color=MAU_CHU_THU, border_width=2)
         elif action == "backtrack":
