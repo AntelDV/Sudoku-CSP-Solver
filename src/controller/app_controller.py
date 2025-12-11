@@ -9,8 +9,8 @@ import threading
 import time
 import math
 
-# Import Generator mới
 from src.model.sudoku_generator import SudokuGenerator
+from src.utils.sudoku_converter import SudokuConverter
 
 if TYPE_CHECKING:
     from src.view.main_window import MainView
@@ -40,7 +40,7 @@ class AppController:
         
         self.is_play_mode = False 
         self.focused_cell = None 
-        self.current_size = 9 # Kích thước mặc định
+        self.current_size = 9 
 
         self.colors = {
             "header": "\033[95m", "blue": "\033[94m", "cyan": "\033[96m",
@@ -105,7 +105,7 @@ class AppController:
                 size = len(grid_data)
                 self.current_size = size
                 if self.view:
-                    self.view.rebuild_grid(size) # Vẽ lại lưới đúng size
+                    self.view.rebuild_grid(size)
                 
                 self.current_puzzle_data = copy.deepcopy(grid_data)
                 self.current_known_solution = None 
@@ -237,7 +237,8 @@ class AppController:
         if entry.cget("state") == "normal":
             entry.delete(0, "end")
             if num != 0: 
-                entry.insert(0, str(num))
+                #  Convert số sang chữ (ví dụ 10->A)
+                entry.insert(0, SudokuConverter.int_to_char(num))
             self.handle_grid_modified(None, r, c)
 
     def handle_grid_modified(self, event, r, c):
@@ -245,17 +246,18 @@ class AppController:
         if self.is_play_mode:
             try:
                 entry_widget = self.view.cac_o_nhap[(r, c)]
-                num_str = entry_widget.get()
+                val_str = entry_widget.get()
                 
-                if num_str == "": 
+                if val_str == "": 
                     self.view.set_cell_validity(r, c, True)
                     return
                 
-                if not num_str.isdigit():
+                #  Convert chữ sang số để kiểm tra luật
+                num = SudokuConverter.char_to_int(val_str)
+                if num == 0: # Input rác
                     entry_widget.delete(0, "end")
                     return
 
-                num = int(num_str)
                 grid_data = self.view.get_grid_data()
                 SudokuBoard_class = self.model_classes['SudokuBoard']
                 board = SudokuBoard_class(grid_data)
@@ -266,8 +268,9 @@ class AppController:
                 
                 if not is_ok:
                     self.view.set_cell_validity(r, c, False)
-                    # Hiện thông báo nhưng KHÔNG XÓA SỐ
-                    self.view.show_message("Sai Luật!", f"Số {num} không hợp lệ tại ô ({r+1}, {c+1})!", is_error=True)
+                    # Hiển thị thông báo với chữ (ví dụ: Số A không hợp lệ)
+                    display_char = SudokuConverter.int_to_char(num)
+                    self.view.show_message("Sai Luật!", f"Giá trị {display_char} không hợp lệ tại ô ({r+1}, {c+1})!", is_error=True)
                 else:
                     self.view.set_cell_validity(r, c, True)
                     
@@ -328,7 +331,10 @@ class AppController:
         s = str(s).replace('.', '0')
         for i in range(n):
             row_str = s[i*n : (i+1)*n]
-            grid.append([int(char) for char in row_str])
+            row_digits = []
+            for char in row_str:
+                row_digits.append(SudokuConverter.char_to_int(char))
+            grid.append(row_digits)
         return grid
 
     def _load_from_txt(self, filepath):
@@ -337,11 +343,17 @@ class AppController:
             for line in f:
                 line = line.strip()
                 if not line or line.startswith('#'): continue
+                
+                # Tự động loại bỏ dấu chấm, gạch, shift gạch
                 cleaned_line = line.replace('.', '0').replace('-', '0').replace('_', '0')
-                # Đọc số
+                
                 row_digits = []
                 for char in cleaned_line:
-                    if char.isdigit(): row_digits.append(int(char))
+                    # Chấp nhận cả số và chữ cái
+                    if char.isalnum(): 
+                        val = SudokuConverter.char_to_int(char)
+                        row_digits.append(val)
+                
                 if row_digits: grid_data.append(row_digits)
         return grid_data
 
